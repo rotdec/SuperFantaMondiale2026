@@ -551,7 +551,11 @@ function pgRose() {
     }
     h += `</div>`;
   });
-  h += `</div><button class="btn-primary" id="btn-refresh" style="margin-top:0">Aggiorna rose</button>`;
+  h += `</div>
+  <div style="display:flex;gap:8px;margin-top:0">
+    <button class="btn-primary" id="btn-refresh" style="flex:1;margin-top:0">🔄 Aggiorna</button>
+    <button class="btn-secondary" id="btn-export-rose" style="flex:1">📤 Esporta JSON</button>
+  </div>`;
   return h;
 }
 
@@ -705,6 +709,20 @@ function bindEvents() {
       document.getElementById('btn-refresh').textContent='Aggiorno...';
       await loadAll(); paint();
     };
+    document.getElementById('btn-export-rose')?.addEventListener('click', () => {
+      const data = {
+        exported: new Date().toISOString(),
+        squadre: teams.map(t => ({
+          id: t.id, name: t.name, manager: t.manager,
+          rosa: t.rosa||[], puntiTotali: t.puntiTotali||0
+        }))
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `rose_sfm_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    });
   }
 }
 
