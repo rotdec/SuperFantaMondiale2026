@@ -109,6 +109,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .mod-btn,.role-btn,.btn-secondary{color:#f0f0f0;border-color:#444}
   .player-item,.classifica-row,.score-total{border-color:#3a3a3a}
   .rosa-pill{background:#444;border-color:#555}
+  .player-name,.player-nation{color:#f0f0f0}
+  .player-nation{color:#aaa}
+  .section-label{color:#aaa}
+  #draft-card .player-item{background:#2a2a2a}
 }
 </style>
 </head>
@@ -541,17 +545,13 @@ function bindEvents() {
       searchEl.addEventListener('input', e => {
         L.draftSearch = e.target.value;
         saveL();
-        // Update only player list without re-rendering the whole tab
         const mt = myTeam(); if(!mt) return;
         const card = document.getElementById('draft-card');
         if(!card) return;
-        // Remove existing player items
         card.querySelectorAll('.player-item').forEach(el => el.remove());
-        // Add new ones
-        const html = buildPlayerList(mt.rosa||[], L.draftRole, L.draftSearch);
-        const tmp = document.createElement('div'); tmp.innerHTML=html;
-        while(tmp.firstChild) card.appendChild(tmp.firstChild);
-        // Re-attach checkbox events
+        const tmp = document.createElement('div');
+        tmp.innerHTML = buildPlayerList(mt.rosa||[], L.draftRole, L.draftSearch);
+        Array.from(tmp.children).forEach(ch => card.appendChild(ch));
         attachCheckboxEvents(card);
       });
       // Keep focus
