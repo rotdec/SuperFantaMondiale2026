@@ -542,7 +542,55 @@ function attachEvents(tab) {
   }
   if(tab==='draft'){
     document.querySelectorAll('[data-drole]').forEach(el=>el.addEventListener('click',()=>{state._draftRole=el.dataset.drole;state._draftSearch='';renderTab('draft');}));
-    document.getElementById('draft-search')?.addEventListener('input',e=>{state._draftSearch=e.target.value;renderTab('draft');});
+    document.getElementById('draft-search')?.addEventListener('input',e=>{
+      state._draftSearch=e.target.value;
+      saveLocal();
+      // Only re-render the player list, not the whole tab
+      const sr=state._draftSearch, ar=state._draftRole||'P';
+      const mt=getMyTeam(); if(!mt) return;
+      const rosa=mt.rosa||[];
+      const canAdd=rosaCount(rosa,ar)<QUOTA[ar];
+      let players=[];
+      SQUADRE_MONDIALI.forEach(s=>s.g.filter(p=>p.r===ar).forEach(p=>players.push({...p,naz:s.naz,flag:s.flag})));
+      if(sr) players=players.filter(p=>p.n.toLowerCase().includes(sr.toLowerCase())||p.naz.toLowerCase().includes(sr.toLowerCase()));
+      players.sort((a,b)=>a.n.localeCompare(b.n));
+      let html='';
+      players.forEach(p=>{
+        const has=rosa.some(r=>r.n===p.n&&r.naz===p.naz);
+        const elim=isEliminated(p.naz);
+        html+=`<div class="player-item">
+          <div class="checkbox ${has?'checked':!canAdd&&!has?'disabled':''}" data-addp='${JSON.stringify({n:p.n,naz:p.naz,r:p.r,flag:p.flag})}'>${has?'✓':''}</div>
+          <span class="role-badge role-${p.r}">${p.r}</span>
+          <div class="player-info">
+            <div class="player-name">${p.n}</div>
+            <div class="player-nation">${p.flag} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
+          </div></div>`;
+      });
+      // Find player list container and update only that
+      const existing = document.querySelectorAll('#content .player-item');
+      if(existing.length>0){
+        const parent=existing[0].parentElement;
+        // Remove all player items
+        existing.forEach(el=>el.remove());
+        // Add new ones
+        const tmp=document.createElement('div');
+        tmp.innerHTML=html;
+        while(tmp.firstChild) parent.appendChild(tmp.firstChild);
+        // Re-attach click events to new checkboxes
+        parent.querySelectorAll('[data-addp]').forEach(el=>el.addEventListener('click',async()=>{
+          if(el.classList.contains('disabled')) return;
+          el.style.opacity='0.4'; el.style.pointerEvents='none';
+          const p=JSON.parse(el.dataset.addp);
+          const mt=getMyTeam(), rosa=mt.rosa||[];
+          const idx=rosa.findIndex(r=>r.n===p.n&&r.naz===p.naz);
+          if(idx>-1) rosa.splice(idx,1);
+          else if(rosaCount(rosa,p.r)<QUOTA[p.r]) rosa.push(p);
+          mt.rosa=rosa;
+          try { await saveTeam(mt); renderTab('draft'); }
+          catch(e){ el.style.opacity=''; el.style.pointerEvents=''; alert('Errore: '+e.message); }
+        }));
+      }
+    });
     document.querySelectorAll('[data-addp]').forEach(el=>el.addEventListener('click',()=>{
       if(el.classList.contains('disabled')) return;
       const mt=getMyTeam(),pn=el.dataset.addp,naz=el.dataset.addnaz,r=el.dataset.addr;
