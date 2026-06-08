@@ -341,7 +341,7 @@ function pgDraft() {
     const cls = c===m?'quota-ok':c>m?'quota-over':'quota-warn';
     h += `<div class="quota-box"><div class="quota-num ${cls}">${c}/${m}</div><div class="quota-label">${rn[r]}</div></div>`;
   });
-  h += `</div></div><div class="card" id="draft-card"><div class="card-title">Scegli i tuoi giocatori</div>
+  h += `</div></div><button class="btn-primary" id="btn-salva-rosa" style="margin-bottom:10px">💾 Salva rosa su Supabase</button><div class="card" id="draft-card"><div class="card-title">Scegli i tuoi giocatori</div>
     <div class="role-tabs">`;
   roles.forEach(r => h += `<button class="role-btn ${L.draftRole===r?'active':''}" data-drole="${r}">${rn[r]} ${rCount(rosa,r)}/${QUOTA[r]}</button>`);
   h += `</div><input class="search-box" id="draft-search" placeholder="Cerca giocatore o nazione..." value="${L.draftSearch}" autocomplete="off">`;
@@ -381,27 +381,89 @@ function pgFormazione() {
   const slotP = form.P||null;
   const pad = (arr,n) => (arr||[]).slice(0,n).concat(Array(Math.max(0,n-(arr||[]).length)).fill(null));
   const sD=pad(form.D,nD), sC=pad(form.C,nC), sA=pad(form.A,nA);
-  const mkSlot=(p,idx,r)=>{
-    const v=getV(p), e=p&&isElim(p.naz);
-    return `<div class="player-slot ${p?'filled':''} ${e?'eliminated':''}" data-fslot="${r}" data-idx="${idx}">
-      ${p?`<div class="slot-name">${p.n.split(' ').pop()}</div><div class="slot-nation">${p.flag||getFlag(p.naz)}</div><div class="slot-vote">${v!==null?v:'?'}</div>`:`<div class="slot-empty">+${r}</div>`}
+  const titolari = [slotP,...sD,...sC,...sA].filter(Boolean);
+  const mt = myTeam(), rosa = mt.rosa||[];
+  const panchina = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
+
+  // Compute lineup with auto-substitution
+  function getEffective(slot, role) {
+    if(!slot) return null;
+    if(!isElim(slot.naz)) return {player:slot, sub:false};
+    // Find first bench player of same role not eliminated
+    const sub = panchina.find(p => p.r===role && !isElim(p.naz));
+    if(sub) return {player:sub, sub:true, original:slot};
+    return {player:slot, sub:false, unavailable:true};
+  }
+
+  const effP = getEffective(slotP, 'P');
+  const effD = sD.map(p => getEffective(p, 'D'));
+  const effC = sC.map(p => getEffective(p, 'C'));
+  const effA = sA.map(p => getEffective(p, 'A'));
+
+  let tot=0;
+  [effP,...effD,...effC,...effA].forEach(e=>{
+    if(e&&e.player&&!e.unavailable){const v=getV(e.player);if(v!==null)tot+=parseFloat(v);}
+  });
+
+  const mkSlot=(eff,idx,r)=>{
+    const p = eff?.player;
+    const v = p ? getV(p) : null;
+    const elim = p && isElim(p.naz);
+    const isSub = eff?.sub;
+    const unavail = eff?.unavailable;
+    const isEmpty = !p;
+    return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" data-fslot="${r}" data-idx="${idx}" style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}">
+      ${p ? `<div class="slot-name" style="${isSub?'color:#f0c040':unavail?'color:#ff8888':''}">${isSub?'⬆ ':''}${p.n.split(' ').pop()}</div>
+              <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
+              <div class="slot-vote">${v!==null?v:'?'}</div>`
+           : `<div class="slot-empty">+${r}</div>`}
     </div>`;
   };
-  let tot=0;
-  [slotP,...sD,...sC,...sA].forEach(p=>{if(p&&!isElim(p.naz)){const v=getV(p);if(v!==null)tot+=parseFloat(v);}});
+
   let h = `<div class="card">
     <div class="giornata-selector"><button class="gsel-btn" id="gk-prev">◀</button><span>Giornata ${gk}</span><button class="gsel-btn" id="gk-next">▶</button></div>
     <div class="module-selector">`;
   MODULI.forEach(m => h += `<button class="mod-btn ${mod===m?'active':''}" data-mod="${m}">${m}</button>`);
-  h += `</div><div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare un giocatore</div>
+  h += `</div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare · <span style="color:#f0c040">⬆ = sostituto automatico</span></div>
     <div class="field">
-      <div class="field-row">${mkSlot(slotP,0,'P')}</div>
-      <div class="field-row">${sD.map((p,i)=>mkSlot(p,i,'D')).join('')}</div>
-      <div class="field-row">${sC.map((p,i)=>mkSlot(p,i,'C')).join('')}</div>
-      <div class="field-row">${sA.map((p,i)=>mkSlot(p,i,'A')).join('')}</div>
+      <div class="field-row">${mkSlot(effP,0,'P')}</div>
+      <div class="field-row">${effD.map((e,i)=>mkSlot(e,i,'D')).join('')}</div>
+      <div class="field-row">${effC.map((e,i)=>mkSlot(e,i,'C')).join('')}</div>
+      <div class="field-row">${effA.map((e,i)=>mkSlot(e,i,'A')).join('')}</div>
     </div>
     <div class="score-total"><span style="font-size:13px;color:#888">Punteggio G${gk}</span><span style="font-size:20px;font-weight:700;color:#1D9E75">${tot.toFixed(1)} pt</span></div>
   </div>`;
+
+  // Panchina section
+  h += `<div class="card"><div class="card-title">🪑 Panchina (${panchina.length} giocatori)</div>`;
+  if(panchina.length === 0) {
+    h += `<div style="font-size:13px;color:#888">Nessun panchinaro — aggiungi più giocatori alla rosa</div>`;
+  } else {
+    const roles = ['P','D','C','A'];
+    const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+    roles.forEach(r => {
+      const rp = panchina.filter(p => p.r===r);
+      if(!rp.length) return;
+      h += `<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px">${rn[r]}</div>`;
+      rp.forEach(p => {
+        const v = getV(p);
+        const elim = isElim(p.naz);
+        h += `<div class="player-item" style="${elim?'opacity:.4':''}">
+          <span class="role-badge role-${p.r}">${p.r}</span>
+          <div class="player-info">
+            <div class="player-name">${p.n}</div>
+            <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
+          </div>
+          <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'}">${v!==null?v:'-'}</span>
+        </div>`;
+      });
+    });
+  }
+  h += `</div>`;
+
+  h += `<button class="btn-primary" id="btn-salva-form">💾 Salva formazione</button>`;
+
   return h;
 }
 
@@ -560,6 +622,21 @@ function bindEvents() {
     }
 
     attachCheckboxEvents(document.getElementById('content'));
+
+    document.getElementById('btn-salva-rosa')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-salva-rosa');
+      btn.disabled=true; btn.textContent='⏳ Salvo...';
+      const mt = myTeam();
+      try {
+        await saveTeam(mt);
+        btn.textContent='✅ Rosa salvata!';
+        setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Salva rosa su Supabase'; }, 2000);
+      } catch(e) {
+        btn.textContent='❌ Errore';
+        btn.disabled=false;
+        alert('Errore salvataggio: '+e.message);
+      }
+    });
   }
 
   if(activeTab==='formazione') {
@@ -567,6 +644,21 @@ function bindEvents() {
     document.getElementById('gk-next').onclick = () => { L.giornata++;saveL();paint(); };
     document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => { L.modulo=b.dataset.mod;saveL();paint(); });
     document.querySelectorAll('[data-fslot]').forEach(el => el.onclick = () => openPicker(el.dataset.fslot, parseInt(el.dataset.idx)));
+    document.getElementById('btn-salva-form')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-salva-form');
+      btn.disabled=true; btn.textContent='⏳ Salvo...';
+      const gk=L.giornata, fkey=L.myId+'_'+gk;
+      const existing = formations[fkey];
+      const form = existing?.formazione || {};
+      try {
+        await saveFormation(L.myId, gk, L.modulo, form);
+        btn.textContent='✅ Formazione salvata!';
+        setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Salva formazione'; }, 2000);
+      } catch(e) {
+        btn.textContent='❌ Errore'; btn.disabled=false;
+        alert('Errore: '+e.message);
+      }
+    });
   }
 
   if(activeTab==='voti') {
