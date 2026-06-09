@@ -365,7 +365,7 @@ function pgDraft() {
   }
   h += `</div>`;
 
-  h += `<button class="btn-primary" id="btn-salva-rosa" style="margin-bottom:10px">💾 Salva rosa su Supabase</button>`;
+  h += `<button class="btn-primary" id="btn-salva-rosa" style="margin-bottom:10px;background:#aaa">💾 Salva rosa</button>`;
 
   h += `<div class="card" id="draft-card"><div class="card-title">Scegli i tuoi giocatori</div>
     <div class="role-tabs">`;
@@ -682,14 +682,29 @@ function bindEvents() {
 
     document.getElementById('btn-salva-rosa')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-salva-rosa');
-      btn.disabled=true; btn.textContent='⏳ Salvo...';
+      btn.disabled=true; btn.textContent='⏳ Salvo...'; btn.style.background='#aaa';
       const mt = myTeam();
+      // Show quota warnings but save anyway
+      const roles=['P','D','C','A'];
+      const rn={P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+      const errors = roles.filter(r => rCount(mt.rosa,r) < QUOTA_MIN[r]);
+      const over = roles.filter(r => rCount(mt.rosa,r) > QUOTA_MAX[r]);
+      if(errors.length||over.length) {
+        const msg = [...errors.map(r=>'Mancano '+rn[r]+' (min '+QUOTA_MIN[r]+')'), ...over.map(r=>'Troppi '+rn[r]+' (max '+QUOTA_MAX[r]+')')].join(', ');
+        if(!confirm('⚠️ Attenzione: '+msg+'. Salvare comunque?')) {
+          btn.disabled=false; btn.textContent='💾 Salva rosa (modifiche non salvate)'; btn.style.background='#e07a10';
+          return;
+        }
+      }
       try {
         await saveTeam(mt);
+        btn.style.background='#1D9E75';
         btn.textContent='✅ Rosa salvata!';
-        setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Salva rosa su Supabase'; }, 2000);
+        btn.disabled=false;
+        setTimeout(()=>{ btn.textContent='💾 Salva rosa'; }, 3000);
       } catch(e) {
-        btn.textContent='❌ Errore';
+        btn.style.background='#A32D2D';
+        btn.textContent='❌ Errore — riprova';
         btn.disabled=false;
         alert('Errore salvataggio: '+e.message);
       }
@@ -827,21 +842,32 @@ function bindEvents() {
 
 function attachCheckboxEvents(container) {
   container.querySelectorAll('[data-addp]').forEach(el => {
-    el.onclick = async () => {
+    el.onclick = () => {
       if(el.classList.contains('disabled')) return;
-      el.style.opacity='0.4'; el.style.pointerEvents='none';
       const p = JSON.parse(el.dataset.addp);
       const mt = myTeam(), rosa = mt.rosa||[];
       const idx = rosa.findIndex(r => r.n===p.n && r.naz===p.naz);
       if(idx>-1) rosa.splice(idx,1);
       else if(rCount(rosa,p.r)<QUOTA_MAX[p.r]) rosa.push(p);
-      mt.rosa=rosa;
-      try {
-        await saveTeam(mt);
-        paint();
-      } catch(e) {
-        el.style.opacity=''; el.style.pointerEvents='';
-        alert('Errore: '+e.message);
+      mt.rosa = rosa;
+      // Update checkbox visually immediately
+      if(idx>-1) { el.classList.remove('checked'); el.textContent=''; }
+      else { el.classList.add('checked'); el.textContent='✓'; }
+      // Update quota counters
+      const roles=['P','D','C','A'];
+      const rn={P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+      document.querySelectorAll('.quota-box').forEach((box,i) => {
+        const r=roles[i];
+        const cnt=rCount(rosa,r), mn=QUOTA_MIN[r], mx=QUOTA_MAX[r];
+        const cls=cnt<mn||cnt>mx?'quota-over':'quota-ok';
+        const num=box.querySelector('.quota-num');
+        if(num){num.textContent=cnt+'/'+mx; num.className='quota-num '+cls;}
+      });
+      // Turn save button orange = unsaved changes
+      const saveBtn = document.getElementById('btn-salva-rosa');
+      if(saveBtn) {
+        saveBtn.style.background='#e07a10';
+        saveBtn.textContent='💾 Salva rosa (modifiche non salvate)';
       }
     };
   });
