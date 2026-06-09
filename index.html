@@ -324,14 +324,33 @@ function pgSquadre() {
       <input class="input-field" id="inp-mgr" value="${mt.manager}" placeholder="Il tuo nome">
       <button class="btn-primary" id="btn-save-team">💾 Salva nome squadra</button></div>`;
   }
-  h += `<div class="card"><div class="card-title">Nazioni eliminate</div>
-    <div style="font-size:12px;color:#888;margin-bottom:8px">Tocca per segnare come eliminata — visibile a tutti</div>
+  const active = NAZ.filter(s => !isElim(s.naz));
+  const elim = NAZ.filter(s => isElim(s.naz));
+  h += `<div class="card">
+    <div class="card-title">🌍 Nazioni attive (${active.length})</div>
+    <div style="font-size:12px;color:#888;margin-bottom:10px">Tocca una nazione per segnarla come eliminata</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px">`;
-  NAZ.forEach(s => {
-    const e = isElim(s.naz);
-    h += `<span data-elim="${s.naz}" style="cursor:pointer;font-size:12px;padding:3px 9px;border-radius:20px;border:1px solid ${e?'#A32D2D':'#e0e0d8'};background:${e?'#FCEBEB':'transparent'};color:${e?'#A32D2D':'inherit'};user-select:none">${s.flag} ${s.naz}</span>`;
+  active.forEach(s => {
+    h += `<span data-elim-add="${s.naz}" style="cursor:pointer;font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0d8;background:#f8f8f4;user-select:none;transition:all .15s">${s.flag} ${s.naz}</span>`;
   });
   h += `</div></div>`;
+
+  h += `<div class="card" style="border-color:${elim.length?'#A32D2D':'#e0e0d8'}">
+    <div class="card-title" style="color:${elim.length?'#A32D2D':'#888'}">🚫 Nazioni eliminate (${elim.length})</div>`;
+  if(!elim.length) {
+    h += `<div style="font-size:13px;color:#ccc">Nessuna nazione eliminata ancora</div>`;
+  } else {
+    h += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`;
+    elim.forEach(s => {
+      h += `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:20px;background:#FCEBEB;border:1px solid #A32D2D;color:#A32D2D;user-select:none">
+        ${s.flag} ${s.naz}
+        <span data-elim-remove="${s.naz}" style="cursor:pointer;font-weight:700;font-size:14px;line-height:1;padding:0 2px" title="Ripristina">✕</span>
+      </span>`;
+    });
+    h += `</div>`;
+  }
+  h += `<button class="btn-primary" id="btn-salva-elim" style="margin-top:${elim.length?'0':'8px'}">💾 Salva eliminazioni su Supabase</button>
+  </div>`;
   return h;
 }
 
@@ -645,12 +664,33 @@ function bindEvents() {
       try { await saveTeam(mt); btn.textContent='Salvato!'; setTimeout(()=>paint(), 600); }
       catch(e) { btn.textContent='Errore'; btn.disabled=false; alert(e.message); }
     });
-    document.querySelectorAll('[data-elim]').forEach(el => el.onclick = async () => {
-      const naz=el.dataset.elim, idx=eliminated.indexOf(naz);
-      if(idx>-1) eliminated.splice(idx,1); else eliminated.push(naz);
-      el.style.opacity='0.4';
-      try { await saveEliminated(); } catch(e) { alert('Errore: '+e.message); }
+    // Add to eliminated
+    document.querySelectorAll('[data-elim-add]').forEach(el => el.onclick = () => {
+      const naz = el.dataset.elimAdd;
+      if(!eliminated.includes(naz)) eliminated.push(naz);
       paint();
+    });
+    // Remove from eliminated
+    document.querySelectorAll('[data-elim-remove]').forEach(el => el.onclick = () => {
+      const naz = el.dataset.elimRemove;
+      const idx = eliminated.indexOf(naz);
+      if(idx>-1) eliminated.splice(idx,1);
+      paint();
+    });
+    // Save button
+    document.getElementById('btn-salva-elim')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-salva-elim');
+      btn.disabled=true; btn.textContent='⏳ Salvo...';
+      try {
+        await saveEliminated();
+        btn.style.background='#1D9E75';
+        btn.textContent='✅ Salvato!';
+        btn.disabled=false;
+        setTimeout(()=>{ btn.textContent='💾 Salva eliminazioni su Supabase'; btn.style.background=''; }, 3000);
+      } catch(e) {
+        btn.textContent='❌ Errore'; btn.disabled=false;
+        alert('Errore: '+e.message);
+      }
     });
   }
 
