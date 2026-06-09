@@ -331,7 +331,7 @@ function pgSquadre() {
     <div style="font-size:12px;color:#888;margin-bottom:10px">Tocca una nazione per segnarla come eliminata</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px">`;
   active.forEach(s => {
-    h += `<span data-elim-add="${s.naz}" style="cursor:pointer;font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #e0e0d8;background:#f8f8f4;user-select:none;transition:all .15s">${s.flag} ${s.naz}</span>`;
+    h += `<span data-elim-add="${s.naz}" style="cursor:pointer;font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #888;background:#444;color:#f0f0f0;user-select:none;transition:all .15s">${s.flag} ${s.naz}</span>`;
   });
   h += `</div></div>`;
 
