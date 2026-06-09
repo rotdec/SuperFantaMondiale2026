@@ -108,6 +108,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .gsel-btn{background:#333;color:#f0f0f0}
   .mod-btn,.role-btn,.btn-secondary{color:#f0f0f0;border-color:#444}
   .player-item,.classifica-row,.score-total{border-color:#3a3a3a}
+  .bench-arrow{background:#333 !important;color:#f0f0f0}
   .rosa-pill{background:#444;border-color:#555}
   .player-name,.player-nation{color:#f0f0f0}
   .player-nation{color:#aaa}
@@ -215,7 +216,8 @@ const NAZ = [
   {naz:"Uzbekistan",flag:"🇺🇿",g:[{n:"Utkir Yusupov",r:"P"},{n:"Abduvohid Nematov",r:"P"},{n:"Botirali Ergashev",r:"P"},{n:"Rustam Ashurmatov",r:"D"},{n:"Farrukh Sayfiev",r:"D"},{n:"Khojiakbar Alijonov",r:"D"},{n:"Sherzod Nasrullaev",r:"D"},{n:"Umar Eshmurodov",r:"D"},{n:"Abdukodir Khusanov",r:"D"},{n:"Abdulla Abdullaev",r:"D"},{n:"Bekhruz Karimov",r:"D"},{n:"Jakhongir Urozov",r:"D"},{n:"Avazbek Ulmasaliev",r:"D"},{n:"Otabek Shukurov",r:"C"},{n:"Jaloliddin Masharipov",r:"C"},{n:"Odiljon Hamrobekov",r:"C"},{n:"Oston Urunov",r:"C"},{n:"Jamshid Iskanderov",r:"C"},{n:"Dostonbek Khamdamov",r:"C"},{n:"Abbosbek Fayzullaev",r:"C"},{n:"Akmal Mozgovoy",r:"C"},{n:"Azizjon Ganiev",r:"C"},{n:"Sherzod Esanov",r:"C"},{n:"Eldor Shomurodov",r:"A"},{n:"Igor Sergeev",r:"A"},{n:"Azizbek Amonov",r:"A"}]},
 ];
 
-const QUOTA={P:4,D:14,C:14,A:12};
+const QUOTA_MIN={P:12,D:14,C:14,A:12};
+const QUOTA_MAX={P:16,D:15,C:15,A:13};
 const MODULI=["4-3-3","4-4-2","3-5-2","3-4-3","4-5-1","5-3-2"];
 
 // ============================================================
@@ -266,9 +268,11 @@ async function saveTeam(team) {
   }]);
 }
 
-async function saveFormation(teamId, giornata, modulo, formazione) {
-  await sbUpsert('formazioni_fm', [{team_id:teamId, giornata, modulo, formazione}]);
-  formations[teamId+'_'+giornata] = {team_id:teamId, giornata, modulo, formazione};
+async function saveFormation(teamId, giornata, modulo, formazione, benchOrder) {
+  const data = {team_id:teamId, giornata, modulo, formazione};
+  if(benchOrder) data.benchOrder = benchOrder;
+  await sbUpsert('formazioni_fm', [data]);
+  formations[teamId+'_'+giornata] = {...formations[teamId+'_'+giornata], ...data};
 }
 
 async function saveEliminated() {
@@ -334,27 +338,50 @@ function pgSquadre() {
 function pgDraft() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra nel tab Squadre</div>`;
   const mt = myTeam(), rosa = mt.rosa||[];
-  const roles = ['P','D','C','A'], rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+  const roles = ['P','D','C','A'];
+  const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+  const rmin = QUOTA_MIN, rmax = QUOTA_MAX;
+
   let h = `<div class="card"><div class="quota-row">`;
   roles.forEach(r => {
-    const c=rCount(rosa,r), m=QUOTA[r];
-    const cls = c===m?'quota-ok':c>m?'quota-over':'quota-warn';
-    h += `<div class="quota-box"><div class="quota-num ${cls}">${c}/${m}</div><div class="quota-label">${rn[r]}</div></div>`;
+    const c=rCount(rosa,r), mn=rmin[r], mx=rmax[r];
+    const cls = c<mn?'quota-over':c>mx?'quota-over':'quota-ok';
+    h += `<div class="quota-box"><div class="quota-num ${cls}">${c}/${mx}</div><div class="quota-label">${rn[r]}<br><span style="font-size:8px">min ${mn}</span></div></div>`;
   });
-  h += `</div></div><button class="btn-primary" id="btn-salva-rosa" style="margin-bottom:10px">💾 Salva rosa su Supabase</button><div class="card" id="draft-card"><div class="card-title">Scegli i tuoi giocatori</div>
+  h += `</div>`;
+
+  // Validation message
+  const errors = roles.filter(r => rCount(rosa,r) < rmin[r]);
+  const over = roles.filter(r => rCount(rosa,r) > rmax[r]);
+  if(errors.length > 0) {
+    h += `<div style="background:#FCEBEB;color:#A32D2D;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px">
+      ❌ Mancano: ${errors.map(r=>rn[r]+' (min '+rmin[r]+')').join(', ')}
+    </div>`;
+  }
+  if(over.length > 0) {
+    h += `<div style="background:#FCEBEB;color:#A32D2D;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px">
+      ❌ Troppi: ${over.map(r=>rn[r]+' (max '+rmax[r]+')').join(', ')}
+    </div>`;
+  }
+  h += `</div>`;
+
+  h += `<button class="btn-primary" id="btn-salva-rosa" style="margin-bottom:10px" ${errors.length||over.length?'disabled style="opacity:.5;margin-bottom:10px"':''}>💾 Salva rosa su Supabase</button>`;
+
+  h += `<div class="card" id="draft-card"><div class="card-title">Scegli i tuoi giocatori</div>
     <div class="role-tabs">`;
-  roles.forEach(r => h += `<button class="role-btn ${L.draftRole===r?'active':''}" data-drole="${r}">${rn[r]} ${rCount(rosa,r)}/${QUOTA[r]}</button>`);
+  roles.forEach(r => h += `<button class="role-btn ${L.draftRole===r?'active':''}" data-drole="${r}">${rn[r]} ${rCount(rosa,r)}/${rmax[r]}</button>`);
   h += `</div><input class="search-box" id="draft-search" placeholder="Cerca giocatore o nazione..." value="${L.draftSearch}" autocomplete="off">`;
   h += buildPlayerList(rosa, L.draftRole, L.draftSearch);
   return h + '</div>';
 }
+
 
 function buildPlayerList(rosa, role, search) {
   let players = [];
   NAZ.forEach(s => s.g.filter(p => p.r===role).forEach(p => players.push({...p, naz:s.naz, flag:s.flag})));
   if(search) players = players.filter(p => p.n.toLowerCase().includes(search.toLowerCase()) || p.naz.toLowerCase().includes(search.toLowerCase()));
   players.sort((a,b) => a.n.localeCompare(b.n));
-  const canAdd = rCount(rosa, role) < QUOTA[role];
+  const canAdd = rCount(rosa, role) < QUOTA_MAX[role];
   let h = '';
   players.forEach(p => {
     const has = rosa.some(r => r.n===p.n && r.naz===p.naz);
@@ -389,8 +416,14 @@ function pgFormazione() {
   function getEffective(slot, role) {
     if(!slot) return null;
     if(!isElim(slot.naz)) return {player:slot, sub:false};
-    // Find first bench player of same role not eliminated
-    const sub = panchina.find(p => p.r===role && !isElim(p.naz));
+    // Find first bench player of same role not eliminated, respecting bench order
+    const benchOrder = formations[L.myId+'_'+gk]?.benchOrder || {};
+    const sorted = panchina.filter(p => p.r===role).sort((a,b) => {
+      const ia = benchOrder[role+'_'+a.n+'_'+a.naz] ?? 999;
+      const ib = benchOrder[role+'_'+b.n+'_'+b.naz] ?? 999;
+      return ia - ib;
+    });
+    const sub = sorted.find(p => !isElim(p.naz));
     if(sub) return {player:sub, sub:true, original:slot};
     return {player:slot, sub:false, unavailable:true};
   }
@@ -435,27 +468,47 @@ function pgFormazione() {
     <div class="score-total"><span style="font-size:13px;color:#888">Punteggio G${gk}</span><span style="font-size:20px;font-weight:700;color:#1D9E75">${tot.toFixed(1)} pt</span></div>
   </div>`;
 
-  // Panchina section
-  h += `<div class="card"><div class="card-title">🪑 Panchina (${panchina.length} giocatori)</div>`;
+  // Panchina section — panchinari ordinabili con frecce
+  // Use bench order from formation data if available
+  const benchOrder = formations[L.myId+'_'+gk]?.benchOrder || {};
+  // Sort panchina by role then by stored order index
+  function getPanchina(role) {
+    const rp = panchina.filter(p => p.r===role);
+    const ordered = [...rp].sort((a,b) => {
+      const ia = benchOrder[role+'_'+a.n+'_'+a.naz] ?? 999;
+      const ib = benchOrder[role+'_'+b.n+'_'+b.naz] ?? 999;
+      return ia - ib;
+    });
+    return ordered;
+  }
+
+  h += `<div class="card"><div class="card-title">🪑 Panchina — ordine sostituzione</div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Usa ↑↓ per cambiare l'ordine · il primo non eliminato entra automaticamente</div>`;
   if(panchina.length === 0) {
     h += `<div style="font-size:13px;color:#888">Nessun panchinaro — aggiungi più giocatori alla rosa</div>`;
   } else {
     const roles = ['P','D','C','A'];
     const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
     roles.forEach(r => {
-      const rp = panchina.filter(p => p.r===r);
+      const rp = getPanchina(r);
       if(!rp.length) return;
-      h += `<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px">${rn[r]}</div>`;
-      rp.forEach(p => {
+      h += `<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px">${rn[r]}</div>`;
+      rp.forEach((p, i) => {
         const v = getV(p);
         const elim = isElim(p.naz);
-        h += `<div class="player-item" style="${elim?'opacity:.4':''}">
+        const pkey = r+'_'+p.n+'_'+p.naz;
+        h += `<div class="player-item" style="${elim?'opacity:.45':''}">
+          <div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">
+            <button class="bench-arrow" data-benchup="${pkey}" data-benchrole="${r}" style="background:#f0f0e8;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;opacity:${i===0?'0.3':'1'}" ${i===0?'disabled':''}>▲</button>
+            <button class="bench-arrow" data-benchdn="${pkey}" data-benchrole="${r}" style="background:#f0f0e8;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;opacity:${i===rp.length-1?'0.3':'1'}" ${i===rp.length-1?'disabled':''}>▼</button>
+          </div>
+          <span style="font-size:11px;color:#888;min-width:16px;text-align:center">${i+1}</span>
           <span class="role-badge role-${p.r}">${p.r}</span>
           <div class="player-info">
             <div class="player-name">${p.n}</div>
             <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
           </div>
-          <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'}">${v!==null?v:'-'}</span>
+          <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right">${v!==null?v:'-'}</span>
         </div>`;
       });
     });
@@ -648,14 +701,60 @@ function bindEvents() {
     document.getElementById('gk-next').onclick = () => { L.giornata++;saveL();paint(); };
     document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => { L.modulo=b.dataset.mod;saveL();paint(); });
     document.querySelectorAll('[data-fslot]').forEach(el => el.onclick = () => openPicker(el.dataset.fslot, parseInt(el.dataset.idx)));
+    // Bench ordering arrows
+    document.querySelectorAll('[data-benchup],[data-benchdn]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const gk=L.giornata, fkey=L.myId+'_'+gk;
+        const existing = formations[fkey] || {};
+        const form = JSON.parse(JSON.stringify(existing.formazione||{}));
+        const benchOrder = JSON.parse(JSON.stringify(existing.benchOrder||{}));
+        const mt = myTeam(), rosa = mt.rosa||[];
+        const titolari = [form.P,...(form.D||[]),...(form.C||[]),...(form.A||[])].filter(Boolean);
+        const panchina = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
+
+        const isUp = btn.hasAttribute('data-benchup');
+        const pkey = isUp ? btn.dataset.benchup : btn.dataset.benchdn;
+        const role = isUp ? btn.dataset.benchrole : btn.dataset.benchrole;
+
+        // Get ordered list for this role
+        const rp = panchina.filter(p => p.r===role).sort((a,b) => {
+          const ia = benchOrder[role+'_'+a.n+'_'+a.naz] ?? 999;
+          const ib = benchOrder[role+'_'+b.n+'_'+b.naz] ?? 999;
+          return ia - ib;
+        });
+
+        const idx = rp.findIndex(p => role+'_'+p.n+'_'+p.naz === pkey);
+        if(idx === -1) return;
+
+        // Swap with neighbor
+        const swapIdx = isUp ? idx-1 : idx+1;
+        if(swapIdx < 0 || swapIdx >= rp.length) return;
+
+        // Re-assign order values
+        rp.forEach((p, i) => { benchOrder[role+'_'+p.n+'_'+p.naz] = i; });
+        // Swap
+        benchOrder[role+'_'+rp[idx].n+'_'+rp[idx].naz] = swapIdx;
+        benchOrder[role+'_'+rp[swapIdx].n+'_'+rp[swapIdx].naz] = idx;
+
+        // Save
+        const newData = {formazione: form, benchOrder, modulo: existing.modulo||L.modulo};
+        formations[fkey] = {team_id:L.myId, giornata:gk, ...newData};
+        try {
+          await saveFormation(L.myId, gk, existing.modulo||L.modulo, form, benchOrder);
+          paint();
+        } catch(e) { alert('Errore: '+e.message); }
+      });
+    });
+
     document.getElementById('btn-salva-form')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-salva-form');
       btn.disabled=true; btn.textContent='⏳ Salvo...';
       const gk=L.giornata, fkey=L.myId+'_'+gk;
       const existing = formations[fkey];
       const form = existing?.formazione || {};
+      const benchOrder = existing?.benchOrder;
       try {
-        await saveFormation(L.myId, gk, L.modulo, form);
+        await saveFormation(L.myId, gk, L.modulo, form, benchOrder);
         btn.textContent='✅ Formazione salvata!';
         setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Salva formazione'; }, 2000);
       } catch(e) {
@@ -735,7 +834,7 @@ function attachCheckboxEvents(container) {
       const mt = myTeam(), rosa = mt.rosa||[];
       const idx = rosa.findIndex(r => r.n===p.n && r.naz===p.naz);
       if(idx>-1) rosa.splice(idx,1);
-      else if(rCount(rosa,p.r)<QUOTA[p.r]) rosa.push(p);
+      else if(rCount(rosa,p.r)<QUOTA_MAX[p.r]) rosa.push(p);
       mt.rosa=rosa;
       try {
         await saveTeam(mt);
