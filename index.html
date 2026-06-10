@@ -405,13 +405,14 @@ function pgDraft() {
 
 
 function buildPlayerList(rosa, role, search) {
-  // Collect all players taken by OTHER teams
+  // Normalize names for tolerant matching (handles "Messi" vs "Lionel Messi")
+  const norm = s => (s||'').toLowerCase().trim();
+  const namesMatch = (a, b) => {
+    const na=norm(a), nb=norm(b);
+    return na===nb || na.endsWith(' '+nb) || nb.endsWith(' '+na) || na.includes(nb) || nb.includes(na);
+  };
+
   const myId = L.myId;
-  const takenByOthers = new Set();
-  teams.forEach(t => {
-    if(t.id === myId) return;
-    (t.rosa||[]).forEach(p => takenByOthers.add(p.n+'_'+p.naz));
-  });
 
   let players = [];
   NAZ.forEach(s => s.g.filter(p => p.r===role).forEach(p => players.push({...p, naz:s.naz, flag:s.flag})));
@@ -420,9 +421,12 @@ function buildPlayerList(rosa, role, search) {
   const canAdd = rCount(rosa, role) < QUOTA_MAX[role];
   let h = '';
   players.forEach(p => {
-    const has = rosa.some(r => r.n===p.n && r.naz===p.naz);
-    const takenKey = p.n+'_'+p.naz;
-    const takenBy = !has && takenByOthers.has(takenKey) ? teams.find(t => t.id!==myId && (t.rosa||[]).some(r=>r.n===p.n&&r.naz===p.naz))?.name : null;
+    const has = rosa.some(r => norm(r.naz)===norm(p.naz) && namesMatch(r.n,p.n));
+    let takenBy = null;
+    if(!has) {
+      const owner = teams.find(t => t.id!==myId && (t.rosa||[]).some(r=>norm(r.naz)===norm(p.naz) && namesMatch(r.n,p.n)));
+      if(owner) takenBy = owner.name;
+    }
     const e = isElim(p.naz);
     const disabled = (!canAdd && !has) || (takenBy && !has);
     h += `<div class="player-item" style="${takenBy?'opacity:.45':''}">
