@@ -405,11 +405,28 @@ function pgDraft() {
 
 
 function buildPlayerList(rosa, role, search) {
-  // Normalize names for tolerant matching (handles "Messi" vs "Lionel Messi")
-  const norm = s => (s||'').toLowerCase().trim();
+  // Normalize names for tolerant matching: accents, ø/Ø, jr/junior, abbreviations
+  const norm = s => (s||'')
+    .replace(/[øØ]/g,'o')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().trim()
+    .replace(/\bjr\b\.?/g,'junior');
   const namesMatch = (a, b) => {
     const na=norm(a), nb=norm(b);
-    return na===nb || na.endsWith(' '+nb) || nb.endsWith(' '+na) || na.includes(nb) || nb.includes(na);
+    if(na===nb) return true;
+    if(na.endsWith(' '+nb) || nb.endsWith(' '+na) || na.includes(nb) || nb.includes(na)) return true;
+    const wordsA = na.split(/\s+/), wordsB = nb.split(/\s+/);
+    const lastA = wordsA[wordsA.length-1].replace('.',''), lastB = wordsB[wordsB.length-1].replace('.','');
+    const firstA = wordsA[0].replace('.',''), firstB = wordsB[0].replace('.','');
+    // "Costa D." vs "Diogo Costa": last word is an initial
+    if(lastA.length===1 && firstB[0]===lastA && firstA===lastB) return true;
+    if(lastB.length===1 && firstA[0]===lastB && firstB===lastA) return true;
+    // Same surname + matching first initial (or single-word name)
+    if(lastA === lastB && lastA.length>2) {
+      if(wordsA.length===1 || wordsB.length===1) return true;
+      if(firstA[0]===firstB[0]) return true;
+    }
+    return false;
   };
 
   const myId = L.myId;
