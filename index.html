@@ -290,9 +290,18 @@ async function saveVoti(giornata, votiObj) {
 // ============================================================
 let activeTab = 'squadre';
 
-function setTab(t) {
+async function setTab(t) {
   activeTab = t;
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  // Reload teams from Supabase when entering draft to get latest taken players
+  if(t === 'draft') {
+    try {
+      const fresh = await sbGet('squadre_fm', '&order=id.asc');
+      if(Array.isArray(fresh)) {
+        teams = fresh.map(x => ({...x, rosa:x.rosa||[], puntiGiornate:x.puntiGiornate||[], puntiTotali:x.puntiTotali||0}));
+      }
+    } catch(e) {}
+  }
   paint();
 }
 
