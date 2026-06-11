@@ -515,7 +515,16 @@ function pgFormazione() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra</div>`;
   const gk=L.giornata;
   const locked = isFormazioneLocked(gk) && !L.adminUnlocked;
-  const saved = formations[L.myId+'_'+gk];
+  let saved = formations[L.myId+'_'+gk];
+  let carriedOver = false;
+  // If no formation for this giornata, carry over from previous giornata as a starting point
+  if(!saved && gk > 1) {
+    const prev = formations[L.myId+'_'+(gk-1)];
+    if(prev && (prev.formazione?.P || prev.formazione?.D?.length)) {
+      saved = prev;
+      carriedOver = true;
+    }
+  }
   const mod = saved?.modulo || '4-3-3';
   const form = saved?.formazione || {};
   const parts = mod.split('-').map(Number), nD=parts[0], nC=parts[1], nA=parts[2];
@@ -575,6 +584,10 @@ function pgFormazione() {
   } else if(L.adminUnlocked) {
     h += `<div style="background:#FFF3CD;color:#856404;padding:8px 12px;border-radius:8px;font-size:11px;margin-bottom:10px;text-align:center">
       ⚠️ Modalità admin attiva — stai modificando una formazione bloccata per gli altri
+    </div>`;
+  } else if(carriedOver) {
+    h += `<div style="background:#E8F4FD;color:#1F6FAD;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;text-align:center">
+      ℹ️ Formazione copiata dalla Giornata ${gk-1} — modifica e salva per confermarla per questa giornata
     </div>`;
   }
   h += `<div class="module-selector">`;
@@ -677,7 +690,8 @@ function pgFormazione() {
 function openPicker(r, idx) {
   const mt = myTeam();
   const gk=L.giornata, fkey=L.myId+'_'+gk;
-  const existing = formations[fkey];
+  let existing = formations[fkey];
+  if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
   const form = existing?.formazione || {};
   // Players already used in OTHER slots (same role, different index, or different role's slot)
   const usedElsewhere = new Set();
@@ -737,7 +751,8 @@ function openPicker(r, idx) {
 function openBenchPicker(role, idx) {
   const mt = myTeam();
   const gk=L.giornata, fkey=L.myId+'_'+gk;
-  const existing = formations[fkey];
+  let existing = formations[fkey];
+  if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
   const form = existing?.formazione || {};
   const benchSlots = JSON.parse(JSON.stringify(existing?.benchSlots || {}));
 
@@ -1052,7 +1067,9 @@ function bindEvents() {
     document.querySelectorAll('[data-mod]').forEach(b => b.onclick = async () => {
       const newMod = b.dataset.mod;
       const gk=L.giornata, fkey=L.myId+'_'+gk;
-      const existing = formations[fkey] || {};
+      let existing = formations[fkey];
+      if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
+      existing = existing || {};
       const form = existing.formazione || {};
       const benchOrder = existing.benchOrder || {};
       // Trim arrays to new module sizes WITHOUT discarding existing players if undefined
@@ -1122,7 +1139,9 @@ function bindEvents() {
       const btn = document.getElementById('btn-salva-form');
       btn.disabled=true; btn.textContent='⏳ Salvo...';
       const gk=L.giornata, fkey=L.myId+'_'+gk;
-      const existing = formations[fkey];
+      let existing = formations[fkey];
+      // If nothing saved for this giornata, carry over from previous
+      if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
       const form = existing?.formazione || {};
       const teamMod = existing?.modulo || '4-3-3';
       const benchOrder = existing?.benchOrder;
