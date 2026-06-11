@@ -593,7 +593,9 @@ function pgFormazione() {
     <div class="score-total"><span style="font-size:13px;color:#888">Punteggio G${gk}</span><span style="font-size:20px;font-weight:700;color:#1D9E75">${tot.toFixed(1)} pt</span></div>
   </div>`;
 
-  h += `<button class="btn-secondary" id="btn-copy-formazione" style="width:100%;margin-bottom:10px">📋 Copia formazione per WhatsApp</button>`;
+  const waText = buildWhatsAppText();
+  const waTextEscaped = waText.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  h += `<button class="btn-secondary" id="btn-copy-formazione" data-watext="${waTextEscaped}" style="width:100%;margin-bottom:10px">📋 Copia formazione per WhatsApp</button>`;
 
   // Panchina section — panchinari ordinabili con frecce
   // Use bench order from formation data if available
@@ -1030,7 +1032,8 @@ function bindEvents() {
     });
 
     document.getElementById('btn-copy-formazione')?.addEventListener('click', async () => {
-      const txt = buildWhatsAppText();
+      const btnEl = document.getElementById('btn-copy-formazione');
+      const txt = btnEl.dataset.watext;
       const btn = document.getElementById('btn-copy-formazione');
       let copied = false;
       try {
