@@ -593,6 +593,8 @@ function pgFormazione() {
     <div class="score-total"><span style="font-size:13px;color:#888">Punteggio G${gk}</span><span style="font-size:20px;font-weight:700;color:#1D9E75">${tot.toFixed(1)} pt</span></div>
   </div>`;
 
+  h += `<button class="btn-secondary" id="btn-copy-formazione" style="width:100%;margin-bottom:10px">📋 Copia formazione per WhatsApp</button>`;
+
   // Panchina section — panchinari ordinabili con frecce
   // Use bench order from formation data if available
   const benchOrder = formations[L.myId+'_'+gk]?.benchOrder || {};
@@ -605,6 +607,25 @@ function pgFormazione() {
       return ia - ib;
     });
     return ordered;
+  }
+
+  // Build WhatsApp-style export text
+  function buildWhatsAppText() {
+    const rn = {P:'Portiere',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
+    const icons = {P:'🧤',D:'🛡️',C:'⚙️',A:'⚽'};
+    const titoFlag = p => p ? `${p.flag||getFlag(p.naz)} ${p.n}` : '-';
+    let txt = '';
+    txt += `${icons.P} Portiere ${titoFlag(slotP)}\n`;
+    txt += `${icons.D} Difensori ${sD.map(titoFlag).join(' - ')}\n`;
+    txt += `${icons.C} Centrocampisti ${sC.map(titoFlag).join(' - ')}\n`;
+    txt += `${icons.A} Attaccanti ${sA.map(titoFlag).join(' - ')}\n`;
+    txt += `🪑 PANCHINA (ordine sostituzione)\n`;
+    ['P','D','C','A'].forEach(r => {
+      const rp = getPanchina(r);
+      if(!rp.length) return;
+      txt += `${icons[r]} ${rn[r]==='Portiere'?'Portieri':rn[r]} ${rp.map(titoFlag).join(' - ')}\n`;
+    });
+    return txt.trim();
   }
 
   h += `<div class="card"><div class="card-title">🪑 Panchina — ordine sostituzione</div>
@@ -1006,6 +1027,27 @@ function bindEvents() {
           paint();
         } catch(e) { alert('Errore: '+e.message); }
       });
+    });
+
+    document.getElementById('btn-copy-formazione')?.addEventListener('click', async () => {
+      const txt = buildWhatsAppText();
+      const btn = document.getElementById('btn-copy-formazione');
+      try {
+        await navigator.clipboard.writeText(txt);
+        btn.textContent = '✅ Copiato! Incolla su WhatsApp';
+        setTimeout(()=>{ btn.textContent = '📋 Copia formazione per WhatsApp'; }, 2500);
+      } catch(e) {
+        // Fallback for browsers without clipboard API
+        const ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✅ Copiato! Incolla su WhatsApp';
+        setTimeout(()=>{ btn.textContent = '📋 Copia formazione per WhatsApp'; }, 2500);
+      }
     });
 
     document.getElementById('btn-salva-form')?.addEventListener('click', async () => {
