@@ -234,7 +234,6 @@ const MODULI=["4-3-3","4-4-2","3-5-2","3-4-3","4-5-1","5-3-2"];
 let L = JSON.parse(localStorage.getItem('sfm26_v4')||'{}');
 L.myId = L.myId ?? null;
 L.giornata = L.giornata ?? 1;
-L.modulo = L.modulo ?? '4-3-3';
 L.draftRole = L.draftRole ?? 'P';
 L.draftSearch = L.draftSearch ?? '';
 const saveL = () => localStorage.setItem('sfm26_v4', JSON.stringify(L));
@@ -513,9 +512,10 @@ function buildPlayerList(rosa, role, search) {
 
 function pgFormazione() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra</div>`;
-  const gk=L.giornata, mod=L.modulo;
+  const gk=L.giornata;
   const locked = isFormazioneLocked(gk) && !L.adminUnlocked;
   const saved = formations[L.myId+'_'+gk];
+  const mod = saved?.modulo || '4-3-3';
   const form = saved?.formazione || {};
   const parts = mod.split('-').map(Number), nD=parts[0], nC=parts[1], nA=parts[2];
   const votiG = voti[gk]||{};
@@ -673,8 +673,9 @@ function openPicker(r, idx) {
       const ri=btn.dataset.pickr, i=parseInt(btn.dataset.pickidx);
       const gk=L.giornata, fkey=L.myId+'_'+gk;
       const existing = formations[fkey];
+      const teamMod = existing?.modulo || '4-3-3';
       const form = JSON.parse(JSON.stringify(existing?.formazione||{}));
-      const np = L.modulo.split('-').map(Number);
+      const np = teamMod.split('-').map(Number);
       const ns = ri==='D'?np[0]:ri==='C'?np[1]:np[2];
       if(ri==='P') form.P=p;
       else {
@@ -683,7 +684,7 @@ function openPicker(r, idx) {
         form[ri][i]=p;
       }
       try {
-        await saveFormation(L.myId, gk, L.modulo, form);
+        await saveFormation(L.myId, gk, teamMod, form, existing?.benchOrder);
         div.remove(); paint();
       } catch(err) {
         btn.disabled=false; btn.textContent='Scegli';
@@ -941,7 +942,26 @@ function bindEvents() {
     });
     document.getElementById('gk-prev').onclick = () => { if(L.giornata>1){L.giornata--;saveL();paint();} };
     document.getElementById('gk-next').onclick = () => { L.giornata++;saveL();paint(); };
-    document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => { L.modulo=b.dataset.mod;saveL();paint(); });
+    document.querySelectorAll('[data-mod]').forEach(b => b.onclick = async () => {
+      const newMod = b.dataset.mod;
+      const gk=L.giornata, fkey=L.myId+'_'+gk;
+      const existing = formations[fkey] || {};
+      const form = existing.formazione || {};
+      const benchOrder = existing.benchOrder || {};
+      // Trim/pad form arrays to new module sizes
+      const np = newMod.split('-').map(Number);
+      const trim = (arr,n) => (arr||[]).slice(0,n);
+      const newForm = {
+        P: form.P || null,
+        D: trim(form.D, np[0]),
+        C: trim(form.C, np[1]),
+        A: trim(form.A, np[2])
+      };
+      try {
+        await saveFormation(L.myId, gk, newMod, newForm, benchOrder);
+        paint();
+      } catch(e) { alert('Errore: '+e.message); }
+    });
     document.querySelectorAll('[data-fslot]').forEach(el => el.onclick = () => openPicker(el.dataset.fslot, parseInt(el.dataset.idx)));
     // Bench ordering arrows
     document.querySelectorAll('[data-benchup],[data-benchdn]').forEach(btn => {
@@ -979,10 +999,10 @@ function bindEvents() {
         benchOrder[role+'_'+rp[swapIdx].n+'_'+rp[swapIdx].naz] = idx;
 
         // Save
-        const newData = {formazione: form, benchOrder, modulo: existing.modulo||L.modulo};
+        const newData = {formazione: form, benchOrder, modulo: existing.modulo||'4-3-3'};
         formations[fkey] = {team_id:L.myId, giornata:gk, ...newData};
         try {
-          await saveFormation(L.myId, gk, existing.modulo||L.modulo, form, benchOrder);
+          await saveFormation(L.myId, gk, existing.modulo||'4-3-3', form, benchOrder);
           paint();
         } catch(e) { alert('Errore: '+e.message); }
       });
@@ -994,9 +1014,10 @@ function bindEvents() {
       const gk=L.giornata, fkey=L.myId+'_'+gk;
       const existing = formations[fkey];
       const form = existing?.formazione || {};
+      const teamMod = existing?.modulo || '4-3-3';
       const benchOrder = existing?.benchOrder;
       try {
-        await saveFormation(L.myId, gk, L.modulo, form, benchOrder);
+        await saveFormation(L.myId, gk, teamMod, form, benchOrder);
         btn.textContent='✅ Formazione salvata!';
         setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Salva formazione'; }, 2000);
       } catch(e) {
