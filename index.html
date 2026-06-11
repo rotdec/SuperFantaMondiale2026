@@ -433,8 +433,11 @@ function buildPlayerList(rosa, role, search) {
     // "Costa D." vs "Diogo Costa": last word is an initial
     if(lastA.length===1 && firstB[0]===lastA && firstA===lastB) return true;
     if(lastB.length===1 && firstA[0]===lastB && firstB===lastA) return true;
-    // Same surname + matching first initial
-    if(lastA === lastB && lastA.length>2 && firstA[0]===firstB[0]) return true;
+    // "B. Fernandes" vs "Bruno Fernandes": first word is a single-letter initial + same surname
+    if(lastA===lastB && lastA.length>2) {
+      if(firstA.length===1 && firstA[0]===firstB[0]) return true;
+      if(firstB.length===1 && firstB[0]===firstA[0]) return true;
+    }
     return false;
   };
 
