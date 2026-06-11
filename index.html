@@ -458,8 +458,9 @@ function buildPlayerList(rosa, role, search) {
     }
     const e = isElim(p.naz);
     const disabled = (!canAdd && !has) || (takenBy && !has);
+    const addpData = JSON.stringify({n:p.n,naz:p.naz,r:p.r,flag:p.flag}).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
     h += `<div class="player-item" style="${takenBy?'opacity:.45':''}">
-      <div class="checkbox ${has?'checked':disabled?'disabled':''}" data-addp='${JSON.stringify({n:p.n,naz:p.naz,r:p.r,flag:p.flag})}'>${has?'✓':takenBy?'🔒':''}</div>
+      <div class="checkbox ${has?'checked':disabled?'disabled':''}" data-addp="${addpData}">${has?'✓':takenBy?'🔒':''}</div>
       <span class="role-badge role-${p.r}">${p.r}</span>
       <div class="player-info">
         <div class="player-name">${p.n}</div>
