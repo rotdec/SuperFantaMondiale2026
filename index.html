@@ -296,9 +296,10 @@ async function saveTeam(team) {
   }]);
 }
 
-async function saveFormation(teamId, giornata, modulo, formazione, benchOrder) {
+async function saveFormation(teamId, giornata, modulo, formazione, benchOrder, benchSlots) {
   const data = {team_id:teamId, giornata, modulo, formazione};
   if(benchOrder) data.benchOrder = benchOrder;
+  if(benchSlots) data.benchSlots = benchSlots;
   await sbUpsert('formazioni_fm', [data]);
   formations[teamId+'_'+giornata] = {...formations[teamId+'_'+giornata], ...data};
 }
@@ -531,13 +532,9 @@ function pgFormazione() {
   function getEffective(slot, role) {
     if(!slot) return null;
     if(!isElim(slot.naz)) return {player:slot, sub:false};
-    // Find first bench player of same role not eliminated, respecting bench order
-    const benchOrder = formations[L.myId+'_'+gk]?.benchOrder || {};
-    const sorted = panchina.filter(p => p.r===role).sort((a,b) => {
-      const ia = benchOrder[role+'_'+a.n+'_'+a.naz] ?? 999;
-      const ib = benchOrder[role+'_'+b.n+'_'+b.naz] ?? 999;
-      return ia - ib;
-    });
+    // Find first bench slot player of same role not eliminated, in slot order
+    const benchSlots = formations[L.myId+'_'+gk]?.benchSlots || {};
+    const sorted = (benchSlots[role]||[]).filter(Boolean);
     const sub = sorted.find(p => !isElim(p.naz));
     if(sub) return {player:sub, sub:true, original:slot};
     return {player:slot, sub:false, unavailable:true};
@@ -593,18 +590,20 @@ function pgFormazione() {
     <div class="score-total"><span style="font-size:13px;color:#888">Punteggio G${gk}</span><span style="font-size:20px;font-weight:700;color:#1D9E75">${tot.toFixed(1)} pt</span></div>
   </div>`;
 
-  // Panchina section — panchinari ordinabili con frecce
-  // Use bench order from formation data if available
-  const benchOrder = formations[L.myId+'_'+gk]?.benchOrder || {};
-  // Sort panchina by role then by stored order index
+  // Panchina section — slot espliciti per ruolo, click per assegnare (come i titolari)
+  // benchSlots format: {P:[{n,naz,r,flag}|null,...], D:[...], C:[...], A:[...]}
+  const benchSlotsRaw = formations[L.myId+'_'+gk]?.benchSlots || {};
   function getPanchina(role) {
-    const rp = panchina.filter(p => p.r===role);
-    const ordered = [...rp].sort((a,b) => {
-      const ia = benchOrder[role+'_'+a.n+'_'+a.naz] ?? 999;
-      const ib = benchOrder[role+'_'+b.n+'_'+b.naz] ?? 999;
-      return ia - ib;
-    });
-    return ordered;
+    const slots = benchSlotsRaw[role] || [];
+    // Only return non-null assigned players, in slot order (for substitution logic)
+    return slots.filter(Boolean);
+  }
+  function getBenchSlots(role) {
+    // Available bench players for this role = panchina of that role
+    const avail = panchina.filter(p => p.r===role);
+    const slots = (benchSlotsRaw[role] || []).slice(0, avail.length);
+    while(slots.length < avail.length) slots.push(null);
+    return slots;
   }
 
   // Build WhatsApp-style export text
@@ -634,33 +633,36 @@ function pgFormazione() {
   h += `<button class="btn-secondary" id="btn-copy-formazione" data-watext="${waTextEscaped}" style="width:100%;margin-bottom:10px">📋 Copia formazione per WhatsApp</button>`;
 
   h += `<div class="card"><div class="card-title">🪑 Panchina — ordine sostituzione</div>
-    <div style="font-size:11px;color:#888;margin-bottom:8px">Usa ↑↓ per cambiare l'ordine · il primo non eliminato entra automaticamente</div>`;
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare il sostituto in quella posizione · il primo non eliminato entra automaticamente</div>`;
   if(panchina.length === 0) {
     h += `<div style="font-size:13px;color:#888">Nessun panchinaro — aggiungi più giocatori alla rosa</div>`;
   } else {
     const roles = ['P','D','C','A'];
     const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
     roles.forEach(r => {
-      const rp = getPanchina(r);
-      if(!rp.length) return;
-      h += `<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px">${rn[r]}</div>`;
-      rp.forEach((p, i) => {
-        const v = getV(p);
-        const elim = isElim(p.naz);
-        const pkey = r+'_'+p.n+'_'+p.naz;
-        h += `<div class="player-item" style="${elim?'opacity:.45':''}">
-          ${locked ? `<span style="font-size:11px;color:#888;min-width:30px;text-align:center">${i+1}.</span>` : `<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">
-            <button class="bench-arrow" data-benchup="${pkey}" data-benchrole="${r}" style="background:#f0f0e8;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;opacity:${i===0?'0.3':'1'}" ${i===0?'disabled':''}>▲</button>
-            <button class="bench-arrow" data-benchdn="${pkey}" data-benchrole="${r}" style="background:#f0f0e8;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;opacity:${i===rp.length-1?'0.3':'1'}" ${i===rp.length-1?'disabled':''}>▼</button>
-          </div>`}
-          <span style="font-size:11px;color:#888;min-width:16px;text-align:center">${i+1}</span>
-          <span class="role-badge role-${p.r}">${p.r}</span>
-          <div class="player-info">
-            <div class="player-name">${p.n}</div>
-            <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
-          </div>
-          <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right">${v!==null?v:'-'}</span>
-        </div>`;
+      const avail = panchina.filter(p => p.r===r);
+      if(!avail.length) return;
+      const slots = getBenchSlots(r);
+      h += `<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px">${rn[r]} (${avail.length} disponibili)</div>`;
+      slots.forEach((p, i) => {
+        if(p) {
+          const v = getV(p);
+          const elim = isElim(p.naz);
+          h += `<div class="player-item" ${locked?'':`data-benchslot="${r}" data-benchidx="${i}"`} style="${elim?'opacity:.45':''}${locked?'':';cursor:pointer'}">
+            <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
+            <span class="role-badge role-${p.r}">${p.r}</span>
+            <div class="player-info">
+              <div class="player-name">${p.n}</div>
+              <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
+            </div>
+            <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right">${v!==null?v:'-'}</span>
+          </div>`;
+        } else {
+          h += `<div class="player-item" ${locked?'':`data-benchslot="${r}" data-benchidx="${i}"`} style="${locked?'':'cursor:pointer'};opacity:.6">
+            <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
+            <div class="player-info"><div class="player-name" style="color:#bbb">+ assegna sostituto</div></div>
+          </div>`;
+        }
       });
     });
   }
@@ -722,13 +724,80 @@ function openPicker(r, idx) {
         form[ri][i]=p;
       }
       try {
-        await saveFormation(L.myId, gk, teamMod, form, existing?.benchOrder);
+        await saveFormation(L.myId, gk, teamMod, form, existing?.benchOrder, existing?.benchSlots);
         div.remove(); paint();
       } catch(err) {
         btn.disabled=false; btn.textContent='Scegli';
         alert('Errore salvataggio: '+err.message);
       }
     };
+  });
+}
+
+function openBenchPicker(role, idx) {
+  const mt = myTeam();
+  const gk=L.giornata, fkey=L.myId+'_'+gk;
+  const existing = formations[fkey];
+  const form = existing?.formazione || {};
+  const benchSlots = JSON.parse(JSON.stringify(existing?.benchSlots || {}));
+
+  // Compute panchina (rosa minus titolari)
+  const titolari = [form.P,...(form.D||[]),...(form.C||[]),...(form.A||[])].filter(Boolean);
+  const rosa = mt.rosa||[];
+  const panchinaAll = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
+  const panchinaRole = panchinaAll.filter(p => p.r===role);
+
+  // Players already assigned to OTHER bench slots of this role
+  const usedElsewhere = new Set();
+  (benchSlots[role]||[]).forEach((p,i) => {
+    if(p && i!==idx) usedElsewhere.add(p.n+'_'+p.naz);
+  });
+  const avail = panchinaRole.filter(p => !usedElsewhere.has(p.n+'_'+p.naz));
+
+  const rN={P:'Portiere',D:'Difensore',C:'Centrocampista',A:'Attaccante'};
+  let h = `<div class="modal-overlay" id="modal-bg"><div class="modal-sheet">
+    <div class="modal-header"><span class="modal-title">${idx+1}° sostituto ${rN[role]}</span><span class="modal-close" id="modal-close">✕</span></div>`;
+  if(!avail.length) h += `<div style="color:#888;text-align:center;padding:20px">Nessun ${role} disponibile in panchina</div>`;
+  avail.forEach(p => {
+    const e = isElim(p.naz);
+    const pdata = JSON.stringify({n:p.n,naz:p.naz,r:p.r,flag:p.flag}).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+    h += `<div class="player-item">
+      <span class="role-badge role-${p.r}">${p.r}</span>
+      <div class="player-info"><div class="player-name" style="${e?'opacity:.4':''}">${p.n}</div><div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${e?'<span class="eliminated-badge">ELIM</span>':''}</div></div>
+      <button class="btn-secondary" style="font-size:12px;padding:5px 10px" data-benchpick="${pdata}">Scegli</button>
+    </div>`;
+  });
+  if(benchSlots[role] && benchSlots[role][idx]) {
+    h += `<div style="margin-top:8px;text-align:center"><span data-benchclear="1" style="font-size:12px;color:#A32D2D;cursor:pointer;text-decoration:underline">Rimuovi sostituto da questa posizione</span></div>`;
+  }
+  h += `</div></div>`;
+  const div = document.createElement('div'); div.id='picker'; div.innerHTML=h;
+  document.body.appendChild(div);
+  div.querySelector('#modal-close').onclick = () => div.remove();
+  div.querySelector('#modal-bg').onclick = e => { if(e.target.id==='modal-bg') div.remove(); };
+
+  const saveSlot = async (player) => {
+    if(!benchSlots[role]) benchSlots[role] = [];
+    while(benchSlots[role].length <= idx) benchSlots[role].push(null);
+    benchSlots[role][idx] = player;
+    try {
+      await saveFormation(L.myId, gk, existing?.modulo||'4-3-3', form, existing?.benchOrder, benchSlots);
+      div.remove(); paint();
+    } catch(err) {
+      alert('Errore salvataggio: '+err.message);
+    }
+  };
+
+  div.querySelectorAll('[data-benchpick]').forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled=true; btn.textContent='...';
+      const decoded = btn.dataset.benchpick.replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+      const p = JSON.parse(decoded);
+      await saveSlot(p);
+    };
+  });
+  div.querySelector('[data-benchclear]')?.addEventListener('click', async () => {
+    await saveSlot(null);
   });
 }
 
@@ -995,55 +1064,16 @@ function bindEvents() {
         C: trim(form.C, np[1]),
         A: trim(form.A, np[2])
       };
+      const benchSlots = existing.benchSlots || {};
       try {
-        await saveFormation(L.myId, gk, newMod, newForm, benchOrder);
+        await saveFormation(L.myId, gk, newMod, newForm, benchOrder, benchSlots);
         paint();
       } catch(e) { alert('Errore: '+e.message); }
     });
     document.querySelectorAll('[data-fslot]').forEach(el => el.onclick = () => openPicker(el.dataset.fslot, parseInt(el.dataset.idx)));
-    // Bench ordering arrows
-    document.querySelectorAll('[data-benchup],[data-benchdn]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const gk=L.giornata, fkey=L.myId+'_'+gk;
-        const existing = formations[fkey] || {};
-        const form = JSON.parse(JSON.stringify(existing.formazione||{}));
-        const benchOrder = JSON.parse(JSON.stringify(existing.benchOrder||{}));
-        const mt = myTeam(), rosa = mt.rosa||[];
-        const titolari = [form.P,...(form.D||[]),...(form.C||[]),...(form.A||[])].filter(Boolean);
-        const panchina = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
-
-        const isUp = btn.hasAttribute('data-benchup');
-        const pkey = isUp ? btn.dataset.benchup : btn.dataset.benchdn;
-        const role = isUp ? btn.dataset.benchrole : btn.dataset.benchrole;
-
-        // Get ordered list for this role
-        const rp = panchina.filter(p => p.r===role).sort((a,b) => {
-          const ia = benchOrder[role+'_'+a.n+'_'+a.naz] ?? 999;
-          const ib = benchOrder[role+'_'+b.n+'_'+b.naz] ?? 999;
-          return ia - ib;
-        });
-
-        const idx = rp.findIndex(p => role+'_'+p.n+'_'+p.naz === pkey);
-        if(idx === -1) return;
-
-        // Swap with neighbor
-        const swapIdx = isUp ? idx-1 : idx+1;
-        if(swapIdx < 0 || swapIdx >= rp.length) return;
-
-        // Re-assign order values
-        rp.forEach((p, i) => { benchOrder[role+'_'+p.n+'_'+p.naz] = i; });
-        // Swap
-        benchOrder[role+'_'+rp[idx].n+'_'+rp[idx].naz] = swapIdx;
-        benchOrder[role+'_'+rp[swapIdx].n+'_'+rp[swapIdx].naz] = idx;
-
-        // Save
-        const newData = {formazione: form, benchOrder, modulo: existing.modulo||'4-3-3'};
-        formations[fkey] = {team_id:L.myId, giornata:gk, ...newData};
-        try {
-          await saveFormation(L.myId, gk, existing.modulo||'4-3-3', form, benchOrder);
-          paint();
-        } catch(e) { alert('Errore: '+e.message); }
-      });
+    // Bench slot click -> open picker
+    document.querySelectorAll('[data-benchslot]').forEach(el => {
+      el.onclick = () => openBenchPicker(el.dataset.benchslot, parseInt(el.dataset.benchidx));
     });
 
     document.getElementById('btn-copy-formazione')?.addEventListener('click', async () => {
@@ -1096,8 +1126,9 @@ function bindEvents() {
       const form = existing?.formazione || {};
       const teamMod = existing?.modulo || '4-3-3';
       const benchOrder = existing?.benchOrder;
+      const benchSlots = existing?.benchSlots;
       try {
-        await saveFormation(L.myId, gk, teamMod, form, benchOrder);
+        await saveFormation(L.myId, gk, teamMod, form, benchOrder, benchSlots);
         btn.textContent='✅ Formazione salvata!';
         setTimeout(()=>{ btn.disabled=false; btn.textContent='💾 Salva formazione'; }, 2000);
       } catch(e) {
