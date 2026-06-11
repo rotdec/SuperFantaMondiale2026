@@ -1032,21 +1032,41 @@ function bindEvents() {
     document.getElementById('btn-copy-formazione')?.addEventListener('click', async () => {
       const txt = buildWhatsAppText();
       const btn = document.getElementById('btn-copy-formazione');
+      let copied = false;
       try {
-        await navigator.clipboard.writeText(txt);
+        if(navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(txt);
+          copied = true;
+        }
+      } catch(e) {}
+      if(!copied) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = txt;
+          ta.style.position='fixed'; ta.style.top='0'; ta.style.left='0'; ta.style.opacity='0';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          copied = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch(e) {}
+      }
+      if(copied) {
         btn.textContent = '✅ Copiato! Incolla su WhatsApp';
         setTimeout(()=>{ btn.textContent = '📋 Copia formazione per WhatsApp'; }, 2500);
-      } catch(e) {
-        // Fallback for browsers without clipboard API
-        const ta = document.createElement('textarea');
-        ta.value = txt;
-        ta.style.position='fixed'; ta.style.opacity='0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        btn.textContent = '✅ Copiato! Incolla su WhatsApp';
-        setTimeout(()=>{ btn.textContent = '📋 Copia formazione per WhatsApp'; }, 2500);
+      } else {
+        // Show a modal with selectable text as last resort
+        const div = document.createElement('div');
+        div.id = 'copy-modal';
+        div.innerHTML = `<div class="modal-overlay" id="copy-modal-bg"><div class="modal-sheet">
+          <div class="modal-header"><span class="modal-title">Copia il testo qui sotto</span><span class="modal-close" id="copy-modal-close">✕</span></div>
+          <textarea readonly style="width:100%;height:300px;padding:10px;border-radius:8px;border:1px solid #ccc;font-size:13px;font-family:inherit" onclick="this.select()">${txt}</textarea>
+          <div style="font-size:12px;color:#888;margin-top:8px">Tocca il testo per selezionarlo tutto, poi copia manualmente</div>
+        </div></div>`;
+        document.body.appendChild(div);
+        div.querySelector('#copy-modal-close').onclick = () => div.remove();
+        div.querySelector('#copy-modal-bg').onclick = e => { if(e.target.id==='copy-modal-bg') div.remove(); };
+        const ta2 = div.querySelector('textarea');
+        ta2.focus(); ta2.select();
       }
     });
 
