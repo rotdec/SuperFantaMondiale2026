@@ -517,10 +517,12 @@ function pgFormazione() {
   const locked = isFormazioneLocked(gk) && !L.adminUnlocked;
   let saved = formations[L.myId+'_'+gk];
   let carriedOver = false;
-  // If no formation for this giornata, carry over from previous giornata as a starting point
-  if(!saved && gk > 1) {
+  // Treat formation as "empty" if it has no titolari at all
+  const isEmpty = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
+  // If no formation (or empty) for this giornata, carry over from previous giornata as a starting point
+  if(isEmpty(saved) && gk > 1) {
     const prev = formations[L.myId+'_'+(gk-1)];
-    if(prev && (prev.formazione?.P || prev.formazione?.D?.length)) {
+    if(!isEmpty(prev)) {
       saved = prev;
       carriedOver = true;
     }
@@ -690,8 +692,9 @@ function pgFormazione() {
 function openPicker(r, idx) {
   const mt = myTeam();
   const gk=L.giornata, fkey=L.myId+'_'+gk;
+const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
   let existing = formations[fkey];
-  if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
+  if(_isEmptyForm(existing) && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
   const form = existing?.formazione || {};
   // Players already used in OTHER slots (same role, different index, or different role's slot)
   const usedElsewhere = new Set();
@@ -751,8 +754,9 @@ function openPicker(r, idx) {
 function openBenchPicker(role, idx) {
   const mt = myTeam();
   const gk=L.giornata, fkey=L.myId+'_'+gk;
+const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
   let existing = formations[fkey];
-  if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
+  if(_isEmptyForm(existing) && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
   const form = existing?.formazione || {};
   const benchSlots = JSON.parse(JSON.stringify(existing?.benchSlots || {}));
 
@@ -1067,8 +1071,9 @@ function bindEvents() {
     document.querySelectorAll('[data-mod]').forEach(b => b.onclick = async () => {
       const newMod = b.dataset.mod;
       const gk=L.giornata, fkey=L.myId+'_'+gk;
+const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
       let existing = formations[fkey];
-      if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
+      if(_isEmptyForm(existing) && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
       existing = existing || {};
       const form = existing.formazione || {};
       const benchOrder = existing.benchOrder || {};
@@ -1139,9 +1144,10 @@ function bindEvents() {
       const btn = document.getElementById('btn-salva-form');
       btn.disabled=true; btn.textContent='⏳ Salvo...';
       const gk=L.giornata, fkey=L.myId+'_'+gk;
+const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
       let existing = formations[fkey];
       // If nothing saved for this giornata, carry over from previous
-      if(!existing && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
+      if(_isEmptyForm(existing) && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
       const form = existing?.formazione || {};
       const teamMod = existing?.modulo || '4-3-3';
       const benchOrder = existing?.benchOrder;
