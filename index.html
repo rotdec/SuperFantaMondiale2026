@@ -244,6 +244,12 @@ let teams = [];
 let eliminated = [];
 let voti = {};
 let formations = {};
+let formLock = {giornata:1, locked:false};
+
+const ADMIN_PASSWORD = 'superAD2026';
+function isFormazioneLocked(giornata) {
+  return formLock.locked && formLock.giornata === giornata;
+}
 
 const myTeam = () => teams.find(t => t.id === L.myId);
 const rCount = (rosa, r) => (rosa||[]).filter(p => p.r === r).length;
@@ -254,11 +260,12 @@ const getFlag = naz => NAZ.find(s => s.naz === naz)?.flag || '';
 // LOAD / SAVE SUPABASE
 // ============================================================
 async function loadAll() {
-  const [t, e, v, f] = await Promise.all([
+  const [t, e, v, f, l] = await Promise.all([
     sbGet('squadre_fm', '&order=id.asc'),
     sbGet('nazioni_eliminate_fm'),
     sbGet('voti_fm'),
-    sbGet('formazioni_fm')
+    sbGet('formazioni_fm'),
+    sbGet('lock_fm')
   ]);
   teams = (t||[]).map(x => ({...x, rosa:x.rosa||[], puntiGiornate:x.puntiGiornate||[], puntiTotali:x.puntiTotali||0}));
   eliminated = (e||[]).map(r => r.naz);
@@ -266,6 +273,12 @@ async function loadAll() {
   (v||[]).forEach(r => { if(!voti[r.giornata]) voti[r.giornata]={}; voti[r.giornata][r.player_key]=r.voto; });
   formations = {};
   (f||[]).forEach(r => { formations[r.team_id+'_'+r.giornata]=r; });
+  if(l && l[0]) formLock = {giornata:l[0].giornata, locked:l[0].locked};
+}
+
+async function saveLock(giornata, locked) {
+  await sbUpsert('lock_fm', [{id:1, giornata, locked}]);
+  formLock = {giornata, locked};
 }
 
 async function saveTeam(team) {
@@ -341,6 +354,17 @@ function pgSquadre() {
       <input class="input-field" id="inp-mgr" value="${mt.manager}" placeholder="Il tuo nome">
       <button class="btn-primary" id="btn-save-team">💾 Salva nome squadra</button></div>`;
   }
+  // Admin: lock formazioni control
+  const lockedNow = isFormazioneLocked(L.giornata);
+  h += `<div class="card">
+    <div class="card-title">🔐 Controllo admin — Giornata ${L.giornata}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:10px">
+      Stato: <strong style="color:${lockedNow?'#A32D2D':'#1D9E75'}">${lockedNow?'🔒 Formazioni bloccate':'🔓 Formazioni aperte'}</strong>
+      ${formLock.giornata !== L.giornata ? `<br><span style="font-size:10px">(blocco riferito a Giornata ${formLock.giornata})</span>` : ''}
+    </div>
+    <button class="btn-primary" id="btn-toggle-lock" style="background:${lockedNow?'#1D9E75':'#A32D2D'}">${lockedNow?'🔓 Sblocca':'🔒 Blocca'} formazioni Giornata ${L.giornata}</button>
+  </div>`;
+
   const active = NAZ.filter(s => !isElim(s.naz));
   const elim = NAZ.filter(s => isElim(s.naz));
   h += `<div class="card">
@@ -473,6 +497,7 @@ function buildPlayerList(rosa, role, search) {
 function pgFormazione() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra</div>`;
   const gk=L.giornata, mod=L.modulo;
+  const locked = isFormazioneLocked(gk) && !L.adminUnlocked;
   const saved = formations[L.myId+'_'+gk];
   const form = saved?.formazione || {};
   const parts = mod.split('-').map(Number), nD=parts[0], nC=parts[1], nA=parts[2];
@@ -518,7 +543,7 @@ function pgFormazione() {
     const isSub = eff?.sub;
     const unavail = eff?.unavailable;
     const isEmpty = !p;
-    return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" data-fslot="${r}" data-idx="${idx}" style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}">
+    return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
       ${p ? `<div class="slot-name" style="${isSub?'color:#f0c040':unavail?'color:#ff8888':''}">${isSub?'⬆ ':''}${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
               <div class="slot-vote">${v!==null?v:'?'}</div>`
@@ -527,9 +552,19 @@ function pgFormazione() {
   };
 
   let h = `<div class="card">
-    <div class="giornata-selector"><button class="gsel-btn" id="gk-prev">◀</button><span>Giornata ${gk}</span><button class="gsel-btn" id="gk-next">▶</button></div>
-    <div class="module-selector">`;
-  MODULI.forEach(m => h += `<button class="mod-btn ${mod===m?'active':''}" data-mod="${m}">${m}</button>`);
+    <div class="giornata-selector"><button class="gsel-btn" id="gk-prev">◀</button><span>Giornata ${gk}</span><button class="gsel-btn" id="gk-next">▶</button></div>`;
+  if(locked) {
+    h += `<div style="background:#FCEBEB;color:#A32D2D;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;text-align:center">
+      🔒 Formazioni bloccate per la Giornata ${gk} — sola lettura
+      <br><span data-admin-unlock="1" style="text-decoration:underline;cursor:pointer;font-size:11px;display:inline-block;margin-top:4px">Sono admin, sblocca temporaneamente</span>
+    </div>`;
+  } else if(L.adminUnlocked) {
+    h += `<div style="background:#FFF3CD;color:#856404;padding:8px 12px;border-radius:8px;font-size:11px;margin-bottom:10px;text-align:center">
+      ⚠️ Modalità admin attiva — stai modificando una formazione bloccata per gli altri
+    </div>`;
+  }
+  h += `<div class="module-selector">`;
+  MODULI.forEach(m => h += `<button class="mod-btn ${mod===m?'active':''}" data-mod="${m}" ${locked?'disabled style="opacity:.5"':''}>${m}</button>`);
   h += `</div>
     <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare · <span style="color:#f0c040">⬆ = sostituto automatico</span></div>
     <div class="field">
@@ -571,10 +606,10 @@ function pgFormazione() {
         const elim = isElim(p.naz);
         const pkey = r+'_'+p.n+'_'+p.naz;
         h += `<div class="player-item" style="${elim?'opacity:.45':''}">
-          <div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">
+          ${locked ? `<span style="font-size:11px;color:#888;min-width:30px;text-align:center">${i+1}.</span>` : `<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">
             <button class="bench-arrow" data-benchup="${pkey}" data-benchrole="${r}" style="background:#f0f0e8;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;opacity:${i===0?'0.3':'1'}" ${i===0?'disabled':''}>▲</button>
             <button class="bench-arrow" data-benchdn="${pkey}" data-benchrole="${r}" style="background:#f0f0e8;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;opacity:${i===rp.length-1?'0.3':'1'}" ${i===rp.length-1?'disabled':''}>▼</button>
-          </div>
+          </div>`}
           <span style="font-size:11px;color:#888;min-width:16px;text-align:center">${i+1}</span>
           <span class="role-badge role-${p.r}">${p.r}</span>
           <div class="player-info">
@@ -588,7 +623,8 @@ function pgFormazione() {
   }
   h += `</div>`;
 
-  h += `<button class="btn-primary" id="btn-salva-form">💾 Salva formazione</button>`;
+  if(!locked) h += `<button class="btn-primary" id="btn-salva-form">💾 Salva formazione</button>`;
+  else h += `<div style="text-align:center;padding:10px;font-size:12px;color:#888">Sola lettura — contatta l'admin per modifiche</div>`;
 
   return h;
 }
@@ -731,6 +767,24 @@ function bindEvents() {
       if(idx>-1) eliminated.splice(idx,1);
       paint();
     });
+    // Admin lock toggle
+    document.getElementById('btn-toggle-lock')?.addEventListener('click', async () => {
+      const pwd = prompt('Password admin:');
+      if(pwd === null) return;
+      if(pwd !== ADMIN_PASSWORD) { alert('Password errata'); return; }
+      const btn = document.getElementById('btn-toggle-lock');
+      const newLocked = !isFormazioneLocked(L.giornata);
+      btn.disabled = true; btn.textContent = '⏳ Salvo...';
+      try {
+        await saveLock(L.giornata, newLocked);
+        L.adminUnlocked = false;
+        paint();
+      } catch(e) {
+        btn.disabled = false;
+        alert('Errore: '+e.message);
+      }
+    });
+
     // Save button
     document.getElementById('btn-salva-elim')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-salva-elim');
@@ -831,6 +885,13 @@ function bindEvents() {
   }
 
   if(activeTab==='formazione') {
+    document.querySelectorAll('[data-admin-unlock]').forEach(el => el.onclick = () => {
+      const pwd = prompt('Password admin:');
+      if(pwd === null) return;
+      if(pwd !== ADMIN_PASSWORD) { alert('Password errata'); return; }
+      L.adminUnlocked = true;
+      paint();
+    });
     document.getElementById('gk-prev').onclick = () => { if(L.giornata>1){L.giornata--;saveL();paint();} };
     document.getElementById('gk-next').onclick = () => { L.giornata++;saveL();paint(); };
     document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => { L.modulo=b.dataset.mod;saveL();paint(); });
