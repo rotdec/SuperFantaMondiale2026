@@ -218,6 +218,14 @@ const NAZ = [
 
 const QUOTA_MIN={P:12,D:14,C:14,A:12};
 const QUOTA_MAX={P:16,D:15,C:15,A:13};
+
+// Deadlines per giornata, caricate da Supabase (admin le imposta)
+let deadlines = {}; // {giornata: ISOString}
+function isFormazioneLocked(giornata) {
+  const d = deadlines[giornata];
+  if(!d) return false;
+  return new Date() >= new Date(d);
+}
 const MODULI=["4-3-3","4-4-2","3-5-2","3-4-3","4-5-1","5-3-2"];
 
 // ============================================================
@@ -414,18 +422,19 @@ function buildPlayerList(rosa, role, search) {
   const namesMatch = (a, b) => {
     const na=norm(a), nb=norm(b);
     if(na===nb) return true;
-    if(na.endsWith(' '+nb) || nb.endsWith(' '+na) || na.includes(nb) || nb.includes(na)) return true;
     const wordsA = na.split(/\s+/), wordsB = nb.split(/\s+/);
     const lastA = wordsA[wordsA.length-1].replace('.',''), lastB = wordsB[wordsB.length-1].replace('.','');
     const firstA = wordsA[0].replace('.',''), firstB = wordsB[0].replace('.','');
+    // "Messi" (1 word) vs "Lionel Messi" (2 words): single word must equal the SURNAME (last word) of the other
+    if(wordsA.length===1 && wordsB.length>1) return na===lastB;
+    if(wordsB.length===1 && wordsA.length>1) return nb===lastA;
+    // Suffix match for multi-word: "Vinicius Junior" vs "Junior" already covered above; here both >1 word
+    if(na.endsWith(' '+nb) || nb.endsWith(' '+na)) return true;
     // "Costa D." vs "Diogo Costa": last word is an initial
     if(lastA.length===1 && firstB[0]===lastA && firstA===lastB) return true;
     if(lastB.length===1 && firstA[0]===lastB && firstB===lastA) return true;
-    // Same surname + matching first initial (or single-word name)
-    if(lastA === lastB && lastA.length>2) {
-      if(wordsA.length===1 || wordsB.length===1) return true;
-      if(firstA[0]===firstB[0]) return true;
-    }
+    // Same surname + matching first initial
+    if(lastA === lastB && lastA.length>2 && firstA[0]===firstB[0]) return true;
     return false;
   };
 
@@ -732,6 +741,31 @@ function bindEvents() {
         btn.textContent='❌ Errore'; btn.disabled=false;
         alert('Errore: '+e.message);
       }
+    });
+
+    // Deadline management
+    document.getElementById('btn-set-deadline')?.addEventListener('click', async () => {
+      const g = parseInt(document.getElementById('deadline-giornata').value);
+      const dt = document.getElementById('deadline-datetime').value;
+      if(!g || g<1) { alert('Inserisci un numero di giornata valido'); return; }
+      if(!dt) { alert('Inserisci data e ora'); return; }
+      const btn = document.getElementById('btn-set-deadline');
+      btn.disabled=true; btn.textContent='⏳ Salvo...';
+      try {
+        // dt is in local time, convert to ISO
+        const iso = new Date(dt).toISOString();
+        await saveDeadline(g, iso);
+        paint();
+      } catch(e) {
+        btn.disabled=false; btn.textContent='⏰ Imposta scadenza';
+        alert('Errore: '+e.message);
+      }
+    });
+    document.querySelectorAll('[data-deadline-remove]').forEach(el => el.onclick = async () => {
+      const g = parseInt(el.dataset.deadlineRemove);
+      if(!confirm('Rimuovere la scadenza per la Giornata '+g+'?')) return;
+      try { await deleteDeadline(g); paint(); }
+      catch(e) { alert('Errore: '+e.message); }
     });
   }
 
