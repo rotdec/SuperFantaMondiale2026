@@ -612,16 +612,19 @@ function pgFormazione() {
     const rn = {P:'Portiere',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
     const icons = {P:'🧤',D:'🛡️',C:'⚙️',A:'⚽'};
     const titoFlag = p => p ? `${p.flag||getFlag(p.naz)} ${p.n}` : '-';
+    const mt = myTeam();
     let txt = '';
-    txt += `${icons.P} Portiere ${titoFlag(slotP)}\n`;
-    txt += `${icons.D} Difensori ${sD.map(titoFlag).join(' - ')}\n`;
-    txt += `${icons.C} Centrocampisti ${sC.map(titoFlag).join(' - ')}\n`;
-    txt += `${icons.A} Attaccanti ${sA.map(titoFlag).join(' - ')}\n`;
+    txt += `*${mt?.name||''}* — Giornata ${gk}\n`;
+    txt += `Modulo: ${mod}\n\n`;
+    txt += `${icons.P} Portiere ${titoFlag(slotP)}\n\n`;
+    txt += `${icons.D} Difensori ${sD.map(titoFlag).join(' - ')}\n\n`;
+    txt += `${icons.C} Centrocampisti ${sC.map(titoFlag).join(' - ')}\n\n`;
+    txt += `${icons.A} Attaccanti ${sA.map(titoFlag).join(' - ')}\n\n`;
     txt += `🪑 PANCHINA (ordine sostituzione)\n`;
     ['P','D','C','A'].forEach(r => {
       const rp = getPanchina(r);
       if(!rp.length) return;
-      txt += `${icons[r]} ${rn[r]==='Portiere'?'Portieri':rn[r]} ${rp.map(titoFlag).join(' - ')}\n`;
+      txt += `${icons[r]} ${rn[r]==='Portiere'?'Portieri':rn[r]} ${rp.map(titoFlag).join(' - ')}\n\n`;
     });
     return txt.trim();
   }
