@@ -244,11 +244,14 @@ let teams = [];
 let eliminated = [];
 let voti = {};
 let formations = {};
-let formLock = {giornata:1, locked:false};
+let formLock = {giornata:1, locked:false, auto_lock_at:null};
 
 const ADMIN_PASSWORD = 'superAD2026';
 function isFormazioneLocked(giornata) {
-  return formLock.locked && formLock.giornata === giornata;
+  if(formLock.giornata !== giornata) return false;
+  if(formLock.locked) return true;
+  if(formLock.auto_lock_at && new Date() >= new Date(formLock.auto_lock_at)) return true;
+  return false;
 }
 
 const myTeam = () => teams.find(t => t.id === L.myId);
@@ -273,12 +276,17 @@ async function loadAll() {
   (v||[]).forEach(r => { if(!voti[r.giornata]) voti[r.giornata]={}; voti[r.giornata][r.player_key]=r.voto; });
   formations = {};
   (f||[]).forEach(r => { formations[r.team_id+'_'+r.giornata]=r; });
-  if(l && l[0]) formLock = {giornata:l[0].giornata, locked:l[0].locked};
+  if(l && l[0]) formLock = {giornata:l[0].giornata, locked:l[0].locked, auto_lock_at:l[0].auto_lock_at};
 }
 
 async function saveLock(giornata, locked) {
-  await sbUpsert('lock_fm', [{id:1, giornata, locked}]);
-  formLock = {giornata, locked};
+  await sbUpsert('lock_fm', [{id:1, giornata, locked, auto_lock_at:formLock.auto_lock_at}]);
+  formLock = {...formLock, giornata, locked};
+}
+
+async function saveAutoLock(giornata, isoString) {
+  await sbUpsert('lock_fm', [{id:1, giornata, locked:formLock.locked, auto_lock_at:isoString}]);
+  formLock = {...formLock, giornata, auto_lock_at:isoString};
 }
 
 async function saveTeam(team) {
@@ -356,13 +364,22 @@ function pgSquadre() {
   }
   // Admin: lock formazioni control
   const lockedNow = isFormazioneLocked(L.giornata);
+  const hasAutoLock = formLock.giornata===L.giornata && formLock.auto_lock_at;
+  const autoLockPassed = hasAutoLock && new Date() >= new Date(formLock.auto_lock_at);
   h += `<div class="card">
     <div class="card-title">🔐 Controllo admin — Giornata ${L.giornata}</div>
     <div style="font-size:12px;color:#888;margin-bottom:10px">
       Stato: <strong style="color:${lockedNow?'#A32D2D':'#1D9E75'}">${lockedNow?'🔒 Formazioni bloccate':'🔓 Formazioni aperte'}</strong>
       ${formLock.giornata !== L.giornata ? `<br><span style="font-size:10px">(blocco riferito a Giornata ${formLock.giornata})</span>` : ''}
+      ${hasAutoLock ? `<br><span style="font-size:11px">⏰ Chiusura automatica: ${new Date(formLock.auto_lock_at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${autoLockPassed?' (passata)':''}</span>` : ''}
     </div>
-    <button class="btn-primary" id="btn-toggle-lock" style="background:${lockedNow?'#1D9E75':'#A32D2D'}">${lockedNow?'🔓 Sblocca':'🔒 Blocca'} formazioni Giornata ${L.giornata}</button>
+    <button class="btn-primary" id="btn-toggle-lock" style="background:${lockedNow?'#1D9E75':'#A32D2D'}">${lockedNow?'🔓 Sblocca':'🔒 Blocca'} ora formazioni Giornata ${L.giornata}</button>
+    <div style="font-size:11px;color:#888;margin:10px 0 4px">Oppure imposta chiusura automatica:</div>
+    <div style="display:flex;gap:8px">
+      <input type="datetime-local" id="auto-lock-input" class="input-field" style="margin-bottom:0;flex:1" value="${formLock.giornata===L.giornata && formLock.auto_lock_at ? new Date(formLock.auto_lock_at).toISOString().slice(0,16) : ''}">
+      <button class="btn-secondary" id="btn-set-autolock" style="white-space:nowrap">⏰ Imposta</button>
+    </div>
+    ${hasAutoLock ? `<div data-clear-autolock="1" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-top:6px;text-decoration:underline">Rimuovi chiusura automatica</div>` : ''}
   </div>`;
 
   const active = NAZ.filter(s => !isElim(s.naz));
@@ -783,6 +800,36 @@ function bindEvents() {
         btn.disabled = false;
         alert('Errore: '+e.message);
       }
+    });
+
+    // Set auto-lock time
+    document.getElementById('btn-set-autolock')?.addEventListener('click', async () => {
+      const dt = document.getElementById('auto-lock-input').value;
+      if(!dt) { alert('Inserisci data e ora'); return; }
+      const pwd = prompt('Password admin:');
+      if(pwd === null) return;
+      if(pwd !== ADMIN_PASSWORD) { alert('Password errata'); return; }
+      const btn = document.getElementById('btn-set-autolock');
+      btn.disabled = true; btn.textContent = '⏳...';
+      try {
+        const iso = new Date(dt).toISOString();
+        await saveAutoLock(L.giornata, iso);
+        paint();
+      } catch(e) {
+        btn.disabled = false; btn.textContent = '⏰ Imposta';
+        alert('Errore: '+e.message);
+      }
+    });
+
+    // Clear auto-lock
+    document.querySelector('[data-clear-autolock]')?.addEventListener('click', async () => {
+      const pwd = prompt('Password admin:');
+      if(pwd === null) return;
+      if(pwd !== ADMIN_PASSWORD) { alert('Password errata'); return; }
+      try {
+        await saveAutoLock(L.giornata, null);
+        paint();
+      } catch(e) { alert('Errore: '+e.message); }
     });
 
     // Save button
