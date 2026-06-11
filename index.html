@@ -673,7 +673,19 @@ function pgFormazione() {
 }
 
 function openPicker(r, idx) {
-  const mt = myTeam(), avail = (mt.rosa||[]).filter(p => p.r===r);
+  const mt = myTeam();
+  const gk=L.giornata, fkey=L.myId+'_'+gk;
+  const existing = formations[fkey];
+  const form = existing?.formazione || {};
+  // Players already used in OTHER slots (same role, different index, or different role's slot)
+  const usedElsewhere = new Set();
+  if(form.P && !(r==='P' && idx===0)) usedElsewhere.add(form.P.n+'_'+form.P.naz);
+  ['D','C','A'].forEach(role => {
+    (form[role]||[]).forEach((p,i) => {
+      if(p && !(role===r && i===idx)) usedElsewhere.add(p.n+'_'+p.naz);
+    });
+  });
+  const avail = (mt.rosa||[]).filter(p => p.r===r && !usedElsewhere.has(p.n+'_'+p.naz));
   const rN={P:'Portiere',D:'Difensore',C:'Centrocampista',A:'Attaccante'};
   let h = `<div class="modal-overlay" id="modal-bg"><div class="modal-sheet">
     <div class="modal-header"><span class="modal-title">Scegli ${rN[r]}</span><span class="modal-close" id="modal-close">✕</span></div>`;
