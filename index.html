@@ -593,10 +593,6 @@ function pgFormazione() {
     <div class="score-total"><span style="font-size:13px;color:#888">Punteggio G${gk}</span><span style="font-size:20px;font-weight:700;color:#1D9E75">${tot.toFixed(1)} pt</span></div>
   </div>`;
 
-  const waText = buildWhatsAppText();
-  const waTextEscaped = waText.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  h += `<button class="btn-secondary" id="btn-copy-formazione" data-watext="${waTextEscaped}" style="width:100%;margin-bottom:10px">📋 Copia formazione per WhatsApp</button>`;
-
   // Panchina section — panchinari ordinabili con frecce
   // Use bench order from formation data if available
   const benchOrder = formations[L.myId+'_'+gk]?.benchOrder || {};
@@ -629,6 +625,10 @@ function pgFormazione() {
     });
     return txt.trim();
   }
+
+  const waText = buildWhatsAppText();
+  const waTextEscaped = waText.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  h += `<button class="btn-secondary" id="btn-copy-formazione" data-watext="${waTextEscaped}" style="width:100%;margin-bottom:10px">📋 Copia formazione per WhatsApp</button>`;
 
   h += `<div class="card"><div class="card-title">🪑 Panchina — ordine sostituzione</div>
     <div style="font-size:11px;color:#888;margin-bottom:8px">Usa ↑↓ per cambiare l'ordine · il primo non eliminato entra automaticamente</div>`;
