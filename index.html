@@ -616,15 +616,15 @@ function pgFormazione() {
     let txt = '';
     txt += `*${mt?.name||''}* — Giornata ${gk}\n`;
     txt += `Modulo: ${mod}\n\n`;
-    txt += `${icons.P} Portiere ${titoFlag(slotP)}\n\n`;
-    txt += `${icons.D} Difensori ${sD.map(titoFlag).join(' - ')}\n\n`;
-    txt += `${icons.C} Centrocampisti ${sC.map(titoFlag).join(' - ')}\n\n`;
-    txt += `${icons.A} Attaccanti ${sA.map(titoFlag).join(' - ')}\n\n`;
+    txt += `${icons.P} Portiere\n${titoFlag(slotP)}\n\n`;
+    txt += `${icons.D} Difensori\n${sD.map(titoFlag).join(' - ')}\n\n`;
+    txt += `${icons.C} Centrocampisti\n${sC.map(titoFlag).join(' - ')}\n\n`;
+    txt += `${icons.A} Attaccanti\n${sA.map(titoFlag).join(' - ')}\n\n`;
     txt += `🪑 PANCHINA (ordine sostituzione)\n`;
     ['P','D','C','A'].forEach(r => {
       const rp = getPanchina(r);
       if(!rp.length) return;
-      txt += `${icons[r]} ${rn[r]==='Portiere'?'Portieri':rn[r]} ${rp.map(titoFlag).join(' - ')}\n\n`;
+      txt += `${icons[r]} ${rn[r]==='Portiere'?'Portieri':rn[r]}\n${rp.map(titoFlag).join(' - ')}\n\n`;
     });
     return txt.trim();
   }
