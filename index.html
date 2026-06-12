@@ -88,6 +88,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .modal-title{font-size:15px;font-weight:600}
 .modal-close{font-size:22px;cursor:pointer;color:#888;padding:4px}
+.bonus-row{background:#f7f7f2}
+.bonus-toggle-active{background:#1D9E75;color:#fff;border-color:#1D9E75}
+.bonus-toggle-inactive{background:#fff;color:#888;border-color:#ddd}
+.bonus-counter-btn{background:#fff;color:#1D9E75;border-color:#ddd}
+
 .rosa-view{background:#f8f8f4;border-radius:8px;padding:10px;margin-bottom:8px}
 .rosa-view-name{font-size:13px;font-weight:600;margin-bottom:6px}
 .rosa-players{display:flex;flex-wrap:wrap;gap:4px}
@@ -114,6 +119,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   .player-nation{color:#aaa}
   .section-label{color:#aaa}
   #draft-card .player-item{background:#2a2a2a}
+  .bonus-row{background:#333}
+  .bonus-toggle-inactive{background:#3a3a3a;color:#ccc;border-color:#555}
+  .bonus-counter-btn{background:#3a3a3a;color:#1D9E75;border-color:#555}
 }
 </style>
 </head>
@@ -846,15 +854,16 @@ function openVotePopup(playerKey, role) {
     list.innerHTML = '';
     bonusDefs.forEach(b => {
       const row = document.createElement('div');
+      row.className = 'bonus-row';
       row.style.display='flex'; row.style.alignItems='center'; row.style.justifyContent='space-between';
-      row.style.padding='6px 8px'; row.style.borderRadius='8px'; row.style.background='#f7f7f2';
+      row.style.padding='6px 8px'; row.style.borderRadius='8px';
       if(b.type==='toggle') {
         const active = !!ev[b.key];
         row.innerHTML = `<span style="font-size:13px">${b.icon} ${b.label}</span>`;
         const btn = document.createElement('button');
-        btn.className='btn-secondary'; btn.style.fontSize='12px'; btn.style.padding='4px 12px';
-        btn.style.background = active ? '#1D9E75' : '';
-        btn.style.color = active ? '#fff' : '';
+        btn.className = active ? 'bonus-toggle-active' : 'bonus-toggle-inactive';
+        btn.style.fontSize='12px'; btn.style.padding='4px 12px'; btn.style.borderRadius='6px'; btn.style.border='1px solid';
+        btn.style.cursor='pointer'; btn.style.fontWeight='600';
         btn.textContent = active ? 'Sì' : 'No';
         btn.onclick = () => { ev[b.key] = !ev[b.key]; renderBonusList(); updateTotal(); };
         row.appendChild(btn);
@@ -863,10 +872,10 @@ function openVotePopup(playerKey, role) {
         const ctrl = document.createElement('div');
         ctrl.style.display='flex'; ctrl.style.alignItems='center'; ctrl.style.gap='10px';
         const minus = document.createElement('button');
-        minus.textContent='−'; minus.className='btn-secondary'; minus.style.padding='2px 10px'; minus.style.fontSize='14px';
-        const val2 = document.createElement('span'); val2.textContent = ev[b.key]||0; val2.style.fontWeight='700'; val2.style.minWidth='16px'; val2.style.textAlign='center';
+        minus.textContent='−'; minus.className='bonus-counter-btn'; minus.style.padding='2px 12px'; minus.style.fontSize='16px'; minus.style.fontWeight='700'; minus.style.borderRadius='6px'; minus.style.border='1px solid'; minus.style.cursor='pointer';
+        const val2 = document.createElement('span'); val2.textContent = ev[b.key]||0; val2.style.fontWeight='700'; val2.style.minWidth='20px'; val2.style.textAlign='center'; val2.style.fontSize='14px';
         const plus = document.createElement('button');
-        plus.textContent='+'; plus.className='btn-secondary'; plus.style.padding='2px 10px'; plus.style.fontSize='14px';
+        plus.textContent='+'; plus.className='bonus-counter-btn'; plus.style.padding='2px 12px'; plus.style.fontSize='16px'; plus.style.fontWeight='700'; plus.style.borderRadius='6px'; plus.style.border='1px solid'; plus.style.cursor='pointer';
         minus.onclick = () => { ev[b.key] = Math.max(0,(ev[b.key]||0)-1); val2.textContent=ev[b.key]; updateTotal(); };
         plus.onclick = () => { ev[b.key] = (ev[b.key]||0)+1; val2.textContent=ev[b.key]; updateTotal(); };
         ctrl.appendChild(minus); ctrl.appendChild(val2); ctrl.appendChild(plus);
