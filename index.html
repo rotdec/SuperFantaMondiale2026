@@ -447,7 +447,7 @@ function pgSquadre() {
 
 function pgDraft() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra nel tab Squadre</div>`;
-  const mt = teams.find(t=>t.id===viewId) || myTeam(), rosa = mt.rosa||[];
+  const mt = myTeam(), rosa = mt.rosa||[];
   const roles = ['P','D','C','A'];
   const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
   const rmin = QUOTA_MIN, rmax = QUOTA_MAX;
