@@ -663,7 +663,7 @@ function pgFormazione() {
         if(p) {
           const v = getV(p);
           const elim = isElim(p.naz);
-          h += `<div class="player-item" ${locked?'':`data-benchslot="${r}" data-benchidx="${i}"`} style="${elim?'opacity:.45':''}${locked?'':';cursor:pointer'}">
+          h += `<div class="player-item" style="${elim?'opacity:.45':''}">
             <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
             <span class="role-badge role-${p.r}">${p.r}</span>
             <div class="player-info">
@@ -673,12 +673,13 @@ function pgFormazione() {
             <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right">${v!==null?v:'-'}</span>
           </div>`;
         } else {
-          h += `<div class="player-item" ${locked?'':`data-benchslot="${r}" data-benchidx="${i}"`} style="${locked?'':'cursor:pointer'};opacity:.6">
+          h += `<div class="player-item" style="opacity:.5">
             <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
-            <div class="player-info"><div class="player-name" style="color:#bbb">+ assegna sostituto</div></div>
+            <div class="player-info"><div class="player-name" style="color:#bbb">— vuoto —</div></div>
           </div>`;
         }
       });
+      if(!locked) h += `<button class="btn-secondary" data-benchedit="${r}" style="width:100%;margin:6px 0 4px;font-size:12px">✏️ Modifica panchina ${rn[r]}</button>`;
     });
   }
   h += `</div>`;
@@ -751,10 +752,10 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
   });
 }
 
-function openBenchPicker(role, idx) {
+function openBenchPicker(role) {
   const mt = myTeam();
   const gk=L.giornata, fkey=L.myId+'_'+gk;
-const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
+  const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
   let existing = formations[fkey];
   if(_isEmptyForm(existing) && gk > 1) existing = formations[L.myId+'_'+(gk-1)];
   const form = existing?.formazione || {};
@@ -764,60 +765,65 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
   const titolari = [form.P,...(form.D||[]),...(form.C||[]),...(form.A||[])].filter(Boolean);
   const rosa = mt.rosa||[];
   const panchinaAll = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
-  const panchinaRole = panchinaAll.filter(p => p.r===role);
+  const avail = panchinaAll.filter(p => p.r===role);
 
-  // Players already assigned to OTHER bench slots of this role
-  const usedElsewhere = new Set();
-  (benchSlots[role]||[]).forEach((p,i) => {
-    if(p && i!==idx) usedElsewhere.add(p.n+'_'+p.naz);
-  });
-  const avail = panchinaRole.filter(p => !usedElsewhere.has(p.n+'_'+p.naz));
+  // Current order for this role (existing slot assignments, filtered to valid available players)
+  let order = (benchSlots[role]||[]).filter(p => p && avail.some(a=>a.n===p.n&&a.naz===p.naz));
 
   const rN={P:'Portiere',D:'Difensore',C:'Centrocampista',A:'Attaccante'};
+  const rNp={P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
   let h = `<div class="modal-overlay" id="modal-bg"><div class="modal-sheet">
-    <div class="modal-header"><span class="modal-title">${idx+1}° sostituto ${rN[role]}</span><span class="modal-close" id="modal-close">✕</span></div>`;
+    <div class="modal-header"><span class="modal-title">Panchina ${rNp[role]}</span><span class="modal-close" id="modal-close">✕</span></div>
+    <div style="font-size:12px;color:#888;margin-bottom:10px">Tocca i giocatori nell'ordine in cui devono entrare: il primo selezionato è il 1° sostituto, il secondo il 2°, ecc.</div>`;
   if(!avail.length) h += `<div style="color:#888;text-align:center;padding:20px">Nessun ${role} disponibile in panchina</div>`;
   avail.forEach(p => {
     const e = isElim(p.naz);
+    const pkey = p.n+'_'+p.naz;
     const pdata = JSON.stringify({n:p.n,naz:p.naz,r:p.r,flag:p.flag}).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
-    h += `<div class="player-item">
-      <span class="role-badge role-${p.r}">${p.r}</span>
+    const slotIdx = order.findIndex(o=>o.n===p.n&&o.naz===p.naz);
+    h += `<div class="player-item" data-benchitem="${pdata}" style="cursor:pointer">
+      <span class="role-badge role-${p.r}" style="${slotIdx>=0?'background:#1D9E75;color:#fff':''}">${slotIdx>=0?(slotIdx+1):p.r}</span>
       <div class="player-info"><div class="player-name" style="${e?'opacity:.4':''}">${p.n}</div><div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${e?'<span class="eliminated-badge">ELIM</span>':''}</div></div>
-      <button class="btn-secondary" style="font-size:12px;padding:5px 10px" data-benchpick="${pdata}">Scegli</button>
     </div>`;
   });
-  if(benchSlots[role] && benchSlots[role][idx]) {
-    h += `<div style="margin-top:8px;text-align:center"><span data-benchclear="1" style="font-size:12px;color:#A32D2D;cursor:pointer;text-decoration:underline">Rimuovi sostituto da questa posizione</span></div>`;
-  }
+  h += `<button class="btn-primary" id="btn-save-bench" style="margin-top:10px">Salva panchina ${rNp[role]}</button>`;
   h += `</div></div>`;
   const div = document.createElement('div'); div.id='picker'; div.innerHTML=h;
   document.body.appendChild(div);
   div.querySelector('#modal-close').onclick = () => div.remove();
   div.querySelector('#modal-bg').onclick = e => { if(e.target.id==='modal-bg') div.remove(); };
 
-  const saveSlot = async (player) => {
-    if(!benchSlots[role]) benchSlots[role] = [];
-    while(benchSlots[role].length <= idx) benchSlots[role].push(null);
-    benchSlots[role][idx] = player;
+  // Click handler: toggle player in/out of order, re-render badges
+  div.querySelectorAll('[data-benchitem]').forEach(item => {
+    item.onclick = () => {
+      const decoded = item.dataset.benchitem.replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+      const p = JSON.parse(decoded);
+      const idx = order.findIndex(o=>o.n===p.n&&o.naz===p.naz);
+      if(idx>=0) order.splice(idx,1); // deselect
+      else order.push(p); // add as next in order
+      // Re-render badges for all items
+      div.querySelectorAll('[data-benchitem]').forEach(el2 => {
+        const pd2 = JSON.parse(el2.dataset.benchitem.replace(/&quot;/g,'"').replace(/&#39;/g,"'"));
+        const i2 = order.findIndex(o=>o.n===pd2.n&&o.naz===pd2.naz);
+        const badge = el2.querySelector('.role-badge');
+        if(i2>=0) { badge.textContent = (i2+1); badge.style.background='#1D9E75'; badge.style.color='#fff'; }
+        else { badge.textContent = pd2.r; badge.style.background=''; badge.style.color=''; }
+      });
+    };
+  });
+
+  div.querySelector('#btn-save-bench').onclick = async () => {
+    const btn = div.querySelector('#btn-save-bench');
+    btn.disabled=true; btn.textContent='⏳ Salvo...';
+    benchSlots[role] = order;
     try {
       await saveFormation(L.myId, gk, existing?.modulo||'4-3-3', form, existing?.benchOrder, benchSlots);
       div.remove(); paint();
     } catch(err) {
+      btn.disabled=false; btn.textContent='Salva panchina '+rNp[role];
       alert('Errore salvataggio: '+err.message);
     }
   };
-
-  div.querySelectorAll('[data-benchpick]').forEach(btn => {
-    btn.onclick = async () => {
-      btn.disabled=true; btn.textContent='...';
-      const decoded = btn.dataset.benchpick.replace(/&quot;/g,'"').replace(/&#39;/g,"'");
-      const p = JSON.parse(decoded);
-      await saveSlot(p);
-    };
-  });
-  div.querySelector('[data-benchclear]')?.addEventListener('click', async () => {
-    await saveSlot(null);
-  });
 }
 
 function pgVoti() {
@@ -1093,9 +1099,9 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
       } catch(e) { alert('Errore: '+e.message); }
     });
     document.querySelectorAll('[data-fslot]').forEach(el => el.onclick = () => openPicker(el.dataset.fslot, parseInt(el.dataset.idx)));
-    // Bench slot click -> open picker
-    document.querySelectorAll('[data-benchslot]').forEach(el => {
-      el.onclick = () => openBenchPicker(el.dataset.benchslot, parseInt(el.dataset.benchidx));
+    // Bench edit button -> open multi-select picker for that role
+    document.querySelectorAll('[data-benchedit]').forEach(el => {
+      el.onclick = () => openBenchPicker(el.dataset.benchedit);
     });
 
     document.getElementById('btn-copy-formazione')?.addEventListener('click', async () => {
