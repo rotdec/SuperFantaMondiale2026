@@ -566,6 +566,14 @@ function pgFormazione() {
   const votiG = voti[gk]||{};
   const eventiG = eventi[gk]||{};
   const getV = p => p ? (votiG[p.n+'_'+p.naz]??null) : null;
+  const getVTotal = p => {
+    if(!p) return null;
+    const base = votiG[p.n+'_'+p.naz];
+    if(base===undefined || base===null) return null;
+    const ev = eventiG[p.n+'_'+p.naz];
+    const total = parseFloat(base) + calcBonus(ev);
+    return Math.round(total*10)/10;
+  };
   const getBonusIcons = p => {
     if(!p) return '';
     const e = eventiG[p.n+'_'+p.naz];
@@ -608,12 +616,13 @@ function pgFormazione() {
 
   let tot=0;
   [effP,...effD,...effC,...effA].forEach(e=>{
-    if(e&&e.player&&!e.unavailable){const v=getV(e.player);if(v!==null)tot+=parseFloat(v);}
+    if(e&&e.player&&!e.unavailable){const v=getVTotal(e.player);if(v!==null)tot+=v;}
   });
 
   const mkSlot=(eff,idx,r)=>{
     const p = eff?.player;
     const v = p ? getV(p) : null;
+    const vTotal = p ? getVTotal(p) : null;
     const elim = p && isElim(p.naz);
     const isSub = eff?.sub;
     const unavail = eff?.unavailable;
@@ -623,7 +632,7 @@ function pgFormazione() {
     return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
       ${p ? `<div class="slot-name" style="${isSub?'color:#f0c040':unavail?'color:#ff8888':''}">${isSub?'⬆ ':''}${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
-              <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="${locked?'':'text-decoration:underline dotted'}">${v!==null?v:'?'}</div>
+              <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="${locked?'':'text-decoration:underline dotted'}">${vTotal!==null?vTotal:'?'}</div>
               ${bonus?`<div style="font-size:10px;line-height:1">${bonus}</div>`:''}`
            : `<div class="slot-empty">+${r}</div>`}
     </div>`;
@@ -715,6 +724,7 @@ function pgFormazione() {
       slots.forEach((p, i) => {
         if(p) {
           const v = getV(p);
+          const vTotal = getVTotal(p);
           const elim = isElim(p.naz);
           const bonus = getBonusIcons(p);
           const voteKey = p.n+'_'+p.naz;
@@ -726,7 +736,7 @@ function pgFormazione() {
               <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
             </div>
             <span style="font-size:11px;margin-right:4px">${bonus}</span>
-            <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right;${locked?'':'text-decoration:underline dotted;cursor:pointer'}" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`}>${v!==null?v:'-'}</span>
+            <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right;${locked?'':'text-decoration:underline dotted;cursor:pointer'}" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`}>${vTotal!==null?vTotal:'-'}</span>
           </div>`;
         } else {
           h += `<div class="player-item" style="opacity:.5">
@@ -1388,7 +1398,16 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
           const np=mod.split('-').map(Number);
           const sD=(form.D||[]).slice(0,np[0]),sC=(form.C||[]).slice(0,np[1]),sA=(form.A||[]).slice(0,np[2]);
           let tot=0;
-          [form.P,...sD,...sC,...sA].forEach(p=>{if(p&&!isElim(p.naz)){const v=voti[gk]?.[p.n+'_'+p.naz];if(v!==undefined)tot+=parseFloat(v);}});
+          [form.P,...sD,...sC,...sA].forEach(p=>{
+            if(p&&!isElim(p.naz)){
+              const pk=p.n+'_'+p.naz;
+              const v=voti[gk]?.[pk];
+              if(v!==undefined){
+                const e=eventi[gk]?.[pk];
+                tot+=parseFloat(v)+calcBonus(e);
+              }
+            }
+          });
           if(!t.puntiGiornate) t.puntiGiornate=[];
           t.puntiGiornate[gk-1]=Math.round(tot*10)/10;
           t.puntiTotali=Math.round(t.puntiGiornate.reduce((a,b)=>a+(b||0),0)*10)/10;
