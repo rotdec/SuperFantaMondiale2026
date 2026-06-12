@@ -318,6 +318,27 @@ async function saveVoti(giornata, votiObj) {
   if(rows.length) await sbUpsert('voti_fm', rows);
 }
 
+async function saveEventi(giornata, eventiObj) {
+  const rows = Object.entries(eventiObj).map(([k,e])=>({giornata, player_key:k, ...e}));
+  if(rows.length) await sbUpsert('eventi_fm', rows);
+}
+
+const EMPTY_EVENT = {gol:0,assist:0,ammonizione:false,espulsione:false,rigore_segnato:0,rigore_sbagliato:0,rigore_parato:0,gol_subiti:0,porta_inviolata:false};
+function calcBonus(e) {
+  if(!e) return 0;
+  let b = 0;
+  b += (e.gol||0)*3;
+  b += (e.assist||0)*1;
+  b += (e.rigore_segnato||0)*2;
+  b += (e.rigore_sbagliato||0)*-3;
+  b += (e.rigore_parato||0)*3;
+  if(e.ammonizione) b -= 0.5;
+  if(e.espulsione) b -= 1;
+  if(e.porta_inviolata) b += 1;
+  b += (e.gol_subiti||0)*-1;
+  return b;
+}
+
 // ============================================================
 // RENDER
 // ============================================================
@@ -590,10 +611,11 @@ function pgFormazione() {
     const unavail = eff?.unavailable;
     const isEmpty = !p;
     const bonus = p ? getBonusIcons(p) : '';
+    const voteKey = p ? p.n+'_'+p.naz : '';
     return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
       ${p ? `<div class="slot-name" style="${isSub?'color:#f0c040':unavail?'color:#ff8888':''}">${isSub?'⬆ ':''}${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
-              <div class="slot-vote">${v!==null?v:'?'}</div>
+              <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="${locked?'':'text-decoration:underline dotted'}">${v!==null?v:'?'}</div>
               ${bonus?`<div style="font-size:10px;line-height:1">${bonus}</div>`:''}`
            : `<div class="slot-empty">+${r}</div>`}
     </div>`;
@@ -687,6 +709,7 @@ function pgFormazione() {
           const v = getV(p);
           const elim = isElim(p.naz);
           const bonus = getBonusIcons(p);
+          const voteKey = p.n+'_'+p.naz;
           h += `<div class="player-item" style="${elim?'opacity:.45':''}">
             <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
             <span class="role-badge role-${p.r}">${p.r}</span>
@@ -695,7 +718,7 @@ function pgFormazione() {
               <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
             </div>
             <span style="font-size:11px;margin-right:4px">${bonus}</span>
-            <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right">${v!==null?v:'-'}</span>
+            <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right;${locked?'':'text-decoration:underline dotted;cursor:pointer'}" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`}>${v!==null?v:'-'}</span>
           </div>`;
         } else {
           h += `<div class="player-item" style="opacity:.5">
@@ -777,6 +800,133 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
   });
 }
 
+function openVotePopup(playerKey, role) {
+  const gk = L.giornata;
+  const vG = voti[gk] || {};
+  const eG = eventi[gk] || {};
+  const val = vG[playerKey] !== undefined ? vG[playerKey] : '';
+  const ev = JSON.parse(JSON.stringify(eG[playerKey] || EMPTY_EVENT));
+
+  const bonusDefs = [
+    {key:'gol', icon:'⚽', label:'Gol', type:'counter'},
+    {key:'assist', icon:'👟', label:'Assist', type:'counter'},
+    {key:'rigore_segnato', icon:'🎯', label:'Rigore segnato', type:'counter'},
+    {key:'rigore_sbagliato', icon:'❌', label:'Rigore sbagliato', type:'counter'},
+    {key:'rigore_parato', icon:'🧤', label:'Rigore parato', type:'counter'},
+    {key:'gol_subiti', icon:'😬', label:'Gol subiti', type:'counter'},
+    {key:'ammonizione', icon:'🟨', label:'Ammonizione', type:'toggle'},
+    {key:'espulsione', icon:'🟥', label:'Espulsione', type:'toggle'},
+    {key:'porta_inviolata', icon:'🛡️', label:'Porta inviolata', type:'toggle'}
+  ];
+
+  const playerName = playerKey.split('_').slice(0,-1).join('_');
+
+  let h = `<div class="modal-overlay" id="modal-bg"><div class="modal-sheet">
+    <div class="modal-header"><span class="modal-title">${playerName}</span><span class="modal-close" id="modal-close">✕</span></div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:12px;color:#888">Voto base</label>
+      <input id="vp-voto" type="number" step=".5" min="0" max="10" value="${val}" placeholder="6" class="input-field" style="margin-bottom:0">
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:6px">Bonus / Malus</div>
+    <div id="vp-bonus-list" style="display:flex;flex-direction:column;gap:6px"></div>
+    <div style="margin-top:12px;text-align:center;font-size:16px;font-weight:700;color:#1D9E75">Totale: <span id="vp-total">-</span></div>
+    <button class="btn-primary" id="btn-save-vote" style="margin-top:12px">Salva voto</button>
+  </div></div>`;
+
+  const div = document.createElement('div'); div.id='picker'; div.innerHTML=h;
+  document.body.appendChild(div);
+  div.querySelector('#modal-close').onclick = () => div.remove();
+  div.querySelector('#modal-bg').onclick = e => { if(e.target.id==='modal-bg') div.remove(); };
+
+  const list = div.querySelector('#vp-bonus-list');
+  const renderBonusList = () => {
+    list.innerHTML = '';
+    bonusDefs.forEach(b => {
+      const row = document.createElement('div');
+      row.style.display='flex'; row.style.alignItems='center'; row.style.justifyContent='space-between';
+      row.style.padding='6px 8px'; row.style.borderRadius='8px'; row.style.background='#f7f7f2';
+      if(b.type==='toggle') {
+        const active = !!ev[b.key];
+        row.innerHTML = `<span style="font-size:13px">${b.icon} ${b.label}</span>`;
+        const btn = document.createElement('button');
+        btn.className='btn-secondary'; btn.style.fontSize='12px'; btn.style.padding='4px 12px';
+        btn.style.background = active ? '#1D9E75' : '';
+        btn.style.color = active ? '#fff' : '';
+        btn.textContent = active ? 'Sì' : 'No';
+        btn.onclick = () => { ev[b.key] = !ev[b.key]; renderBonusList(); updateTotal(); };
+        row.appendChild(btn);
+      } else {
+        row.innerHTML = `<span style="font-size:13px">${b.icon} ${b.label}</span>`;
+        const ctrl = document.createElement('div');
+        ctrl.style.display='flex'; ctrl.style.alignItems='center'; ctrl.style.gap='10px';
+        const minus = document.createElement('button');
+        minus.textContent='−'; minus.className='btn-secondary'; minus.style.padding='2px 10px'; minus.style.fontSize='14px';
+        const val2 = document.createElement('span'); val2.textContent = ev[b.key]||0; val2.style.fontWeight='700'; val2.style.minWidth='16px'; val2.style.textAlign='center';
+        const plus = document.createElement('button');
+        plus.textContent='+'; plus.className='btn-secondary'; plus.style.padding='2px 10px'; plus.style.fontSize='14px';
+        minus.onclick = () => { ev[b.key] = Math.max(0,(ev[b.key]||0)-1); val2.textContent=ev[b.key]; updateTotal(); };
+        plus.onclick = () => { ev[b.key] = (ev[b.key]||0)+1; val2.textContent=ev[b.key]; updateTotal(); };
+        ctrl.appendChild(minus); ctrl.appendChild(val2); ctrl.appendChild(plus);
+        row.appendChild(ctrl);
+      }
+      list.appendChild(row);
+    });
+  };
+
+  const updateTotal = () => {
+    const base = parseFloat(div.querySelector('#vp-voto').value);
+    const total = div.querySelector('#vp-total');
+    if(isNaN(base)) { total.textContent = '-'; return; }
+    total.textContent = (base + calcBonus(ev)).toFixed(2).replace(/\.00$/,'').replace(/(\.\d)0$/,'$1');
+  };
+
+  renderBonusList();
+  updateTotal();
+  div.querySelector('#vp-voto').addEventListener('input', updateTotal);
+
+  div.querySelector('#btn-save-vote').onclick = async () => {
+    const btn = div.querySelector('#btn-save-vote');
+    const base = parseFloat(div.querySelector('#vp-voto').value);
+    if(isNaN(base)) { alert('Inserisci un voto base valido'); return; }
+    btn.disabled=true; btn.textContent='⏳ Salvo...';
+    try {
+      if(!voti[gk]) voti[gk]={};
+      voti[gk][playerKey] = base;
+      if(!eventi[gk]) eventi[gk]={};
+      eventi[gk][playerKey] = ev;
+      await saveVoti(gk, {[playerKey]: base});
+      await saveEventi(gk, {[playerKey]: ev});
+      // Recalculate points for all teams (same logic as Voti tab save)
+      for(const t of teams) {
+        const fd = formations[t.id+'_'+gk];
+        if(!fd) continue;
+        const mod=fd.modulo||'4-3-3', form=fd.formazione||{};
+        const np=mod.split('-').map(Number);
+        const sD=(form.D||[]).slice(0,np[0]),sC=(form.C||[]).slice(0,np[1]),sA=(form.A||[]).slice(0,np[2]);
+        let tot=0;
+        [form.P,...sD,...sC,...sA].forEach(p=>{
+          if(p&&!isElim(p.naz)){
+            const pk=p.n+'_'+p.naz;
+            const v=voti[gk]?.[pk];
+            if(v!==undefined){
+              const e=eventi[gk]?.[pk];
+              tot+=parseFloat(v)+calcBonus(e);
+            }
+          }
+        });
+        if(!t.puntiGiornate) t.puntiGiornate=[];
+        t.puntiGiornate[gk-1]=Math.round(tot*10)/10;
+        t.puntiTotali=Math.round(t.puntiGiornate.reduce((a,b)=>a+(b||0),0)*10)/10;
+        await saveTeam(t);
+      }
+      div.remove(); paint();
+    } catch(err) {
+      btn.disabled=false; btn.textContent='Salva voto';
+      alert('Errore: '+err.message);
+    }
+  };
+}
+
 function openBenchPicker(role) {
   const mt = myTeam();
   const gk=L.giornata, fkey=L.myId+'_'+gk;
@@ -855,7 +1005,8 @@ function pgVoti() {
   const gk=L.giornata, vG=voti[gk]||{};
   let h = `<div class="card">
     <div class="giornata-selector"><button class="gsel-btn" id="vk-prev">◀</button><span>Voti Giornata ${gk}</span><button class="gsel-btn" id="vk-next">▶</button></div>
-    <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>`;
+    <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Campo e tocca il giocatore.</div>`;
   NAZ.forEach(s => {
     h += `<div class="section-label">${s.flag} ${s.naz}</div>`;
     s.g.forEach(p => {
@@ -1127,6 +1278,14 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
     // Bench edit button -> open multi-select picker for that role
     document.querySelectorAll('[data-benchedit]').forEach(el => {
       el.onclick = () => openBenchPicker(el.dataset.benchedit);
+    });
+
+    // Vote/bonus popup -> stop propagation so it doesn't trigger the slot picker
+    document.querySelectorAll('[data-votekey]').forEach(el => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        if(el.dataset.votekey) openVotePopup(el.dataset.votekey, el.dataset.voterole);
+      };
     });
 
     document.getElementById('btn-copy-formazione')?.addEventListener('click', async () => {
