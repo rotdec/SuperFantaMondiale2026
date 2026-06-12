@@ -242,6 +242,7 @@ const saveL = () => localStorage.setItem('sfm26_v4', JSON.stringify(L));
 let teams = [];
 let eliminated = [];
 let voti = {};
+let eventi = {};
 let formations = {};
 let formLock = {giornata:1, locked:false, auto_lock_at:null};
 
@@ -262,17 +263,20 @@ const getFlag = naz => NAZ.find(s => s.naz === naz)?.flag || '';
 // LOAD / SAVE SUPABASE
 // ============================================================
 async function loadAll() {
-  const [t, e, v, f, l] = await Promise.all([
+  const [t, e, v, f, l, ev] = await Promise.all([
     sbGet('squadre_fm', '&order=id.asc'),
     sbGet('nazioni_eliminate_fm'),
     sbGet('voti_fm'),
     sbGet('formazioni_fm'),
-    sbGet('lock_fm')
+    sbGet('lock_fm'),
+    sbGet('eventi_fm')
   ]);
   teams = (t||[]).map(x => ({...x, rosa:x.rosa||[], puntiGiornate:x.puntiGiornate||[], puntiTotali:x.puntiTotali||0}));
   eliminated = (e||[]).map(r => r.naz);
   voti = {};
   (v||[]).forEach(r => { if(!voti[r.giornata]) voti[r.giornata]={}; voti[r.giornata][r.player_key]=r.voto; });
+  eventi = {};
+  (ev||[]).forEach(r => { if(!eventi[r.giornata]) eventi[r.giornata]={}; eventi[r.giornata][r.player_key]=r; });
   formations = {};
   (f||[]).forEach(r => { formations[r.team_id+'_'+r.giornata]=r; });
   if(l && l[0]) formLock = {giornata:l[0].giornata, locked:l[0].locked, auto_lock_at:l[0].auto_lock_at};
@@ -531,7 +535,24 @@ function pgFormazione() {
   const form = saved?.formazione || {};
   const parts = mod.split('-').map(Number), nD=parts[0], nC=parts[1], nA=parts[2];
   const votiG = voti[gk]||{};
+  const eventiG = eventi[gk]||{};
   const getV = p => p ? (votiG[p.n+'_'+p.naz]??null) : null;
+  const getBonusIcons = p => {
+    if(!p) return '';
+    const e = eventiG[p.n+'_'+p.naz];
+    if(!e) return '';
+    let icons = '';
+    for(let i=0;i<(e.gol||0);i++) icons += '⚽';
+    for(let i=0;i<(e.assist||0);i++) icons += '👟';
+    for(let i=0;i<(e.rigore_segnato||0);i++) icons += '🎯';
+    for(let i=0;i<(e.rigore_sbagliato||0);i++) icons += '❌';
+    for(let i=0;i<(e.rigore_parato||0);i++) icons += '🧤';
+    if(e.ammonizione) icons += '🟨';
+    if(e.espulsione) icons += '🟥';
+    if(e.porta_inviolata) icons += '🛡️';
+    for(let i=0;i<(e.gol_subiti||0);i++) icons += '😬';
+    return icons;
+  };
   const slotP = form.P||null;
   const pad = (arr,n) => (arr||[]).slice(0,n).concat(Array(Math.max(0,n-(arr||[]).length)).fill(null));
   const sD=pad(form.D,nD), sC=pad(form.C,nC), sA=pad(form.A,nA);
@@ -568,10 +589,12 @@ function pgFormazione() {
     const isSub = eff?.sub;
     const unavail = eff?.unavailable;
     const isEmpty = !p;
+    const bonus = p ? getBonusIcons(p) : '';
     return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
       ${p ? `<div class="slot-name" style="${isSub?'color:#f0c040':unavail?'color:#ff8888':''}">${isSub?'⬆ ':''}${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
-              <div class="slot-vote">${v!==null?v:'?'}</div>`
+              <div class="slot-vote">${v!==null?v:'?'}</div>
+              ${bonus?`<div style="font-size:10px;line-height:1">${bonus}</div>`:''}`
            : `<div class="slot-empty">+${r}</div>`}
     </div>`;
   };
@@ -663,6 +686,7 @@ function pgFormazione() {
         if(p) {
           const v = getV(p);
           const elim = isElim(p.naz);
+          const bonus = getBonusIcons(p);
           h += `<div class="player-item" style="${elim?'opacity:.45':''}">
             <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
             <span class="role-badge role-${p.r}">${p.r}</span>
@@ -670,6 +694,7 @@ function pgFormazione() {
               <div class="player-name">${p.n}</div>
               <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
             </div>
+            <span style="font-size:11px;margin-right:4px">${bonus}</span>
             <span style="font-size:14px;font-weight:600;color:${v!==null?'#1D9E75':'#ccc'};min-width:28px;text-align:right">${v!==null?v:'-'}</span>
           </div>`;
         } else {
