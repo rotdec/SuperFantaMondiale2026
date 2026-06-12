@@ -807,17 +807,20 @@ function openVotePopup(playerKey, role) {
   const val = vG[playerKey] !== undefined ? vG[playerKey] : '';
   const ev = JSON.parse(JSON.stringify(eG[playerKey] || EMPTY_EVENT));
 
-  const bonusDefs = [
+  const isGK = role === 'P';
+  let bonusDefs = [
     {key:'gol', icon:'⚽', label:'Gol', type:'counter'},
     {key:'assist', icon:'👟', label:'Assist', type:'counter'},
     {key:'rigore_segnato', icon:'🎯', label:'Rigore segnato', type:'counter'},
     {key:'rigore_sbagliato', icon:'❌', label:'Rigore sbagliato', type:'counter'},
-    {key:'rigore_parato', icon:'🧤', label:'Rigore parato', type:'counter'},
-    {key:'gol_subiti', icon:'😬', label:'Gol subiti', type:'counter'},
     {key:'ammonizione', icon:'🟨', label:'Ammonizione', type:'toggle'},
-    {key:'espulsione', icon:'🟥', label:'Espulsione', type:'toggle'},
-    {key:'porta_inviolata', icon:'🛡️', label:'Porta inviolata', type:'toggle'}
+    {key:'espulsione', icon:'🟥', label:'Espulsione', type:'toggle'}
   ];
+  if(isGK) {
+    bonusDefs.push({key:'rigore_parato', icon:'🧤', label:'Rigore parato', type:'counter'});
+    bonusDefs.push({key:'gol_subiti', icon:'😬', label:'Gol subiti', type:'counter'});
+    bonusDefs.push({key:'porta_inviolata', icon:'🛡️', label:'Porta inviolata (no gol subiti)', type:'toggle'});
+  }
 
   const playerName = playerKey.split('_').slice(0,-1).join('_');
 
