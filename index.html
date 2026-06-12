@@ -447,7 +447,7 @@ function pgSquadre() {
 
 function pgDraft() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra nel tab Squadre</div>`;
-  const mt = myTeam(), rosa = mt.rosa||[];
+  const mt = teams.find(t=>t.id===viewId) || myTeam(), rosa = mt.rosa||[];
   const roles = ['P','D','C','A'];
   const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
   const rmin = QUOTA_MIN, rmax = QUOTA_MAX;
@@ -547,14 +547,16 @@ function buildPlayerList(rosa, role, search) {
 function pgFormazione() {
   if(L.myId===null) return `<div style="padding:40px;text-align:center;color:#888">Prima seleziona la tua squadra</div>`;
   const gk=L.giornata;
-  const locked = isFormazioneLocked(gk) && !L.adminUnlocked;
-  let saved = formations[L.myId+'_'+gk];
+  const viewId = (L.viewTeamId!==undefined && L.viewTeamId!==null) ? L.viewTeamId : L.myId;
+  const isOwnTeam = viewId === L.myId;
+  const locked = (isFormazioneLocked(gk) && !L.adminUnlocked) || !isOwnTeam;
+  let saved = formations[viewId+'_'+gk];
   let carriedOver = false;
   // Treat formation as "empty" if it has no titolari at all
   const isEmpty = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(Boolean) || (f.formazione?.C||[]).some(Boolean) || (f.formazione?.A||[]).some(Boolean));
   // If no formation (or empty) for this giornata, carry over from previous giornata as a starting point
   if(isEmpty(saved) && gk > 1) {
-    const prev = formations[L.myId+'_'+(gk-1)];
+    const prev = formations[viewId+'_'+(gk-1)];
     if(!isEmpty(prev)) {
       saved = prev;
       carriedOver = true;
@@ -594,7 +596,7 @@ function pgFormazione() {
   const pad = (arr,n) => (arr||[]).slice(0,n).concat(Array(Math.max(0,n-(arr||[]).length)).fill(null));
   const sD=pad(form.D,nD), sC=pad(form.C,nC), sA=pad(form.A,nA);
   const titolari = [slotP,...sD,...sC,...sA].filter(Boolean);
-  const mt = myTeam(), rosa = mt.rosa||[];
+  const mt = teams.find(t=>t.id===viewId) || myTeam(), rosa = mt.rosa||[];
   const panchina = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
 
   // Compute lineup with auto-substitution
@@ -602,7 +604,7 @@ function pgFormazione() {
     if(!slot) return null;
     if(!isElim(slot.naz)) return {player:slot, sub:false};
     // Find first bench slot player of same role not eliminated, in slot order
-    const benchSlots = formations[L.myId+'_'+gk]?.benchSlots || {};
+    const benchSlots = formations[viewId+'_'+gk]?.benchSlots || {};
     const sorted = (benchSlots[role]||[]).filter(Boolean);
     const sub = sorted.find(p => !isElim(p.naz));
     if(sub) return {player:sub, sub:true, original:slot};
@@ -638,9 +640,24 @@ function pgFormazione() {
     </div>`;
   };
 
-  let h = `<div class="card">
+  // Team viewer selector
+  let h = `<div class="card" style="padding-bottom:10px">
+    <div style="font-size:11px;color:#888;margin-bottom:6px">Visualizza formazione di:</div>
+    <select id="team-viewer" class="input-field" style="margin-bottom:0">`;
+  teams.forEach(t => h += `<option value="${t.id}" ${t.id===viewId?'selected':''}>${t.id===L.myId?'👑 ':''}${t.name}</option>`);
+  h += `</select>`;
+  if(!isOwnTeam) {
+    h += `<div style="margin-top:8px;text-align:center"><span data-back-to-mine="1" style="font-size:12px;color:#1D9E75;cursor:pointer;text-decoration:underline">← Torna alla mia formazione</span></div>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="card">
     <div class="giornata-selector"><button class="gsel-btn" id="gk-prev">◀</button><span>Giornata ${gk}</span><button class="gsel-btn" id="gk-next">▶</button></div>`;
-  if(locked) {
+  if(!isOwnTeam) {
+    h += `<div style="background:#E8F4FD;color:#1F6FAD;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;text-align:center">
+      👀 Stai visualizzando la formazione di <strong>${mt?.name||''}</strong> — sola lettura
+    </div>`;
+  } else if(locked) {
     h += `<div style="background:#FCEBEB;color:#A32D2D;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;text-align:center">
       🔒 Formazioni bloccate per la Giornata ${gk} — sola lettura
       <br><span data-admin-unlock="1" style="text-decoration:underline;cursor:pointer;font-size:11px;display:inline-block;margin-top:4px">Sono admin, sblocca temporaneamente</span>
@@ -669,7 +686,7 @@ function pgFormazione() {
 
   // Panchina section — slot espliciti per ruolo, click per assegnare (come i titolari)
   // benchSlots format: {P:[{n,naz,r,flag}|null,...], D:[...], C:[...], A:[...]}
-  const benchSlotsRaw = formations[L.myId+'_'+gk]?.benchSlots || {};
+  const benchSlotsRaw = formations[viewId+'_'+gk]?.benchSlots || {};
   function getPanchina(role) {
     const slots = benchSlotsRaw[role] || [];
     // Only return non-null assigned players, in slot order (for substitution logic)
@@ -688,7 +705,7 @@ function pgFormazione() {
     const rn = {P:'Portiere',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
     const icons = {P:'🧤',D:'🛡️',C:'⚙️',A:'⚽'};
     const titoFlag = p => p ? `${p.flag||getFlag(p.naz)} ${p.n}` : '-';
-    const mt = myTeam();
+    const mt = teams.find(t=>t.id===viewId) || myTeam();
     let txt = '';
     txt += `*${mt?.name||''}* — Giornata ${gk}\n`;
     txt += `Modulo: ${mod}\n\n`;
@@ -1091,7 +1108,7 @@ function bindEvents() {
 
   if(activeTab==='squadre') {
     document.querySelectorAll('.team-card').forEach(el => el.onclick = () => {
-      L.myId = parseInt(el.dataset.tid); saveL(); paint();
+      L.myId = parseInt(el.dataset.tid); L.viewTeamId = L.myId; saveL(); paint();
     });
     document.getElementById('btn-save-team')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-save-team');
@@ -1263,6 +1280,14 @@ function bindEvents() {
   }
 
   if(activeTab==='formazione') {
+    document.getElementById('team-viewer')?.addEventListener('change', (e) => {
+      L.viewTeamId = parseInt(e.target.value);
+      paint();
+    });
+    document.querySelector('[data-back-to-mine]')?.addEventListener('click', () => {
+      L.viewTeamId = L.myId;
+      paint();
+    });
     document.querySelectorAll('[data-admin-unlock]').forEach(el => el.onclick = () => {
       const pwd = prompt('Password admin:');
       if(pwd === null) return;
@@ -1450,7 +1475,7 @@ function attachCheckboxEvents(container) {
     el.onclick = () => {
       if(el.classList.contains('disabled')) return;
       const p = JSON.parse(el.dataset.addp);
-      const mt = myTeam(), rosa = mt.rosa||[];
+      const mt = teams.find(t=>t.id===viewId) || myTeam(), rosa = mt.rosa||[];
       const idx = rosa.findIndex(r => r.n===p.n && r.naz===p.naz);
       if(idx>-1) rosa.splice(idx,1);
       else if(rCount(rosa,p.r)<QUOTA_MAX[p.r]) rosa.push(p);
