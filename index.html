@@ -50,13 +50,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .quota-label{font-size:9px;color:#888;margin-top:1px;text-transform:uppercase;letter-spacing:.3px}
 .quota-ok{color:#1D9E75}.quota-warn{color:#BA7517}.quota-over{color:#A32D2D}
 .field{background:linear-gradient(180deg,#1a6b34 0%,#1a5c2e 100%);border-radius:12px;padding:16px 8px;min-height:300px}
-.field-row{display:flex;justify-content:center;gap:4px;margin-bottom:12px}
-.player-slot{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.28);border-radius:8px;padding:7px 3px;text-align:center;min-width:54px;max-width:70px;flex:1;cursor:pointer}
+.field-row{display:flex;justify-content:center;gap:3px;margin-bottom:10px}
+.player-slot{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.28);border-radius:8px;padding:6px 2px;text-align:center;min-width:50px;max-width:74px;flex:1;cursor:pointer}
 .player-slot.filled{background:rgba(255,255,255,.2)}
 .player-slot.eliminated{opacity:.4;background:rgba(200,40,40,.35)}
-.slot-name{font-size:9.5px;color:#fff;font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.slot-nation{font-size:8px;color:rgba(255,255,255,.65);margin-top:1px}
-.slot-vote{font-size:11px;color:#7adfb0;font-weight:700;margin-top:2px}
+.slot-name{font-size:11.5px;color:#fff;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot-nation{font-size:13px;color:rgba(255,255,255,.75);margin-top:2px}
+.slot-vote{font-size:14px;color:#7adfb0;font-weight:800;margin-top:3px}
 .slot-empty{font-size:9px;color:rgba(255,255,255,.4);padding:4px 0}
 .module-selector{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .mod-btn{padding:5px 11px;font-size:12px;border-radius:20px;border:.5px solid #ccc;background:transparent;cursor:pointer;color:#1a1a1a;font-weight:500}
@@ -427,7 +427,7 @@ function pgSquadre() {
     h += `<div class="team-card ${mine?'selected':''}" data-tid="${t.id}">
       <div class="team-name">${mine?'👑 ':''}${t.name}</div>
       <div class="team-manager">${t.manager}</div>
-      <div class="team-count">${(t.rosa||[]).length}/44</div>
+      <div class="team-count">${(t.rosa||[]).length}/52</div>
     </div>`;
   });
   h += `</div></div>`;
@@ -494,26 +494,24 @@ function pgDraft() {
   const roles = ['P','D','C','A'];
   const rn = {P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
   const rmin = QUOTA_MIN, rmax = QUOTA_MAX;
+  const totTarget = roles.reduce((a,r)=>a+rmin[r],0);
+  const totCount = roles.reduce((a,r)=>a+rCount(rosa,r),0);
 
-  let h = `<div class="card"><div class="quota-row">`;
+  let h = `<div class="card">
+    <div id="rosa-total" style="text-align:center;font-size:14px;font-weight:700;margin-bottom:8px;color:${totCount>=totTarget?'#1D9E75':'#A32D2D'}">Totale: ${totCount}/${totTarget}</div>
+    <div class="quota-row">`;
   roles.forEach(r => {
-    const c=rCount(rosa,r), mn=rmin[r], mx=rmax[r];
-    const cls = c<mn?'quota-over':c>mx?'quota-over':'quota-ok';
-    h += `<div class="quota-box"><div class="quota-num ${cls}">${c}/${mx}</div><div class="quota-label">${rn[r]}<br><span style="font-size:8px">min ${mn}</span></div></div>`;
+    const c=rCount(rosa,r), mn=rmin[r];
+    const cls = c<mn?'quota-over':'quota-ok';
+    h += `<div class="quota-box"><div class="quota-num ${cls}">${c}/${mn}</div><div class="quota-label">${rn[r]}</div></div>`;
   });
   h += `</div>`;
 
   // Validation message
   const errors = roles.filter(r => rCount(rosa,r) < rmin[r]);
-  const over = roles.filter(r => rCount(rosa,r) > rmax[r]);
   if(errors.length > 0) {
     h += `<div style="background:#FCEBEB;color:#A32D2D;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px">
       ❌ Mancano: ${errors.map(r=>rn[r]+' (min '+rmin[r]+')').join(', ')}
-    </div>`;
-  }
-  if(over.length > 0) {
-    h += `<div style="background:#FCEBEB;color:#A32D2D;padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:8px">
-      ❌ Troppi: ${over.map(r=>rn[r]+' (max '+rmax[r]+')').join(', ')}
     </div>`;
   }
   h += `</div>`;
@@ -564,7 +562,6 @@ function buildPlayerList(rosa, role, search) {
   NAZ.forEach(s => s.g.filter(p => p.r===role).forEach(p => players.push({...p, naz:s.naz, flag:s.flag})));
   if(search) players = players.filter(p => p.n.toLowerCase().includes(search.toLowerCase()) || p.naz.toLowerCase().includes(search.toLowerCase()));
   players.sort((a,b) => a.n.localeCompare(b.n));
-  const canAdd = rCount(rosa, role) < QUOTA_MAX[role];
   let h = '';
   players.forEach(p => {
     const has = rosa.some(r => norm(r.naz)===norm(p.naz) && namesMatch(r.n,p.n));
@@ -574,7 +571,7 @@ function buildPlayerList(rosa, role, search) {
       if(owner) takenBy = owner.name;
     }
     const e = isElim(p.naz);
-    const disabled = (!canAdd && !has) || (takenBy && !has);
+    const disabled = (takenBy && !has);
     const addpData = JSON.stringify({n:p.n,naz:p.naz,r:p.r,flag:p.flag}).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
     h += `<div class="player-item" style="${takenBy?'opacity:.45':''}">
       <div class="checkbox ${has?'checked':disabled?'disabled':''}" data-addp="${addpData}">${has?'✓':takenBy?'🔒':''}</div>
@@ -1100,10 +1097,11 @@ function buildVotiList(gk, search) {
     h += `<div class="section-label">${s.flag} ${s.naz}</div>`;
     playersToShow.forEach(p => {
       const key=p.n+'_'+s.naz, val=vG[key]!==undefined?vG[key]:'';
-      h += `<div class="player-item">
+      const hasVote = val!=='';
+      h += `<div class="player-item" style="${hasVote?'background:#E1F5EE':''}">
         <span class="role-badge role-${p.r}">${p.r}</span>
         <div class="player-info"><div class="player-name">${p.n}</div></div>
-        <input class="vote-input" data-vkey="${key}" value="${val}" placeholder="6" type="number" step=".5" min="0" max="10">
+        <input class="vote-input" data-vkey="${key}" value="${val}" placeholder="" type="number" step=".5" min="0" max="10">
       </div>`;
     });
   });
@@ -1140,7 +1138,7 @@ function pgRose() {
   const roles = ['P','D','C','A'];
   teams.forEach(t => {
     const rosa = t.rosa||[];
-    h += `<div class="rosa-view"><div class="rosa-view-name">${t.id===L.myId?'👑 ':''}${t.name} <span style="font-size:11px;color:#888">(${t.manager}) · ${rosa.length}/44</span></div>`;
+    h += `<div class="rosa-view"><div class="rosa-view-name">${t.id===L.myId?'👑 ':''}${t.name} <span style="font-size:11px;color:#888">(${t.manager}) · ${rosa.length}/52</span></div>`;
     if(!rosa.length) { h += `<div style="font-size:12px;color:#bbb">Rosa non ancora compilata</div>`; }
     else {
       h += `<div class="rosa-players">`;
@@ -1330,9 +1328,8 @@ function bindEvents() {
       const roles=['P','D','C','A'];
       const rn={P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
       const errors = roles.filter(r => rCount(mt.rosa,r) < QUOTA_MIN[r]);
-      const over = roles.filter(r => rCount(mt.rosa,r) > QUOTA_MAX[r]);
-      if(errors.length||over.length) {
-        const msg = [...errors.map(r=>'Mancano '+rn[r]+' (min '+QUOTA_MIN[r]+')'), ...over.map(r=>'Troppi '+rn[r]+' (max '+QUOTA_MAX[r]+')')].join(', ');
+      if(errors.length) {
+        const msg = errors.map(r=>'Mancano '+rn[r]+' (min '+QUOTA_MIN[r]+')').join(', ');
         if(!confirm('⚠️ Attenzione: '+msg+'. Salvare comunque?')) {
           btn.disabled=false; btn.textContent='💾 Salva rosa (modifiche non salvate)'; btn.style.background='#e07a10';
           return;
@@ -1509,6 +1506,16 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
         saveL();
         const list = document.getElementById('voti-list');
         if(list) list.innerHTML = buildVotiList(L.giornata, L.votiSearch);
+        attachVotoInputHandlers();
+      });
+    }
+    attachVotoInputHandlers();
+    function attachVotoInputHandlers() {
+      document.querySelectorAll('.vote-input').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const row = inp.closest('.player-item');
+          if(row) row.style.background = inp.value!=='' ? '#E1F5EE' : '';
+        });
       });
     }
     document.getElementById('btn-save-voti')?.addEventListener('click', async () => {
@@ -1564,7 +1571,7 @@ function attachCheckboxEvents(container) {
       const mt = teams.find(t=>t.id===viewId) || myTeam(), rosa = mt.rosa||[];
       const idx = rosa.findIndex(r => r.n===p.n && r.naz===p.naz);
       if(idx>-1) rosa.splice(idx,1);
-      else if(rCount(rosa,p.r)<QUOTA_MAX[p.r]) rosa.push(p);
+      else rosa.push(p);
       mt.rosa = rosa;
       // Update checkbox visually immediately
       if(idx>-1) { el.classList.remove('checked'); el.textContent=''; }
@@ -1574,11 +1581,19 @@ function attachCheckboxEvents(container) {
       const rn={P:'Portieri',D:'Difensori',C:'Centrocampisti',A:'Attaccanti'};
       document.querySelectorAll('.quota-box').forEach((box,i) => {
         const r=roles[i];
-        const cnt=rCount(rosa,r), mn=QUOTA_MIN[r], mx=QUOTA_MAX[r];
-        const cls=cnt<mn||cnt>mx?'quota-over':'quota-ok';
+        const cnt=rCount(rosa,r), mn=QUOTA_MIN[r];
+        const cls=cnt<mn?'quota-over':'quota-ok';
         const num=box.querySelector('.quota-num');
-        if(num){num.textContent=cnt+'/'+mx; num.className='quota-num '+cls;}
+        if(num){num.textContent=cnt+'/'+mn; num.className='quota-num '+cls;}
       });
+      // Update total
+      const totalEl = document.getElementById('rosa-total');
+      if(totalEl) {
+        const totCnt = roles.reduce((a,r)=>a+rCount(rosa,r),0);
+        const totTgt = roles.reduce((a,r)=>a+QUOTA_MIN[r],0);
+        totalEl.textContent = 'Totale: '+totCnt+'/'+totTgt;
+        totalEl.style.color = totCnt>=totTgt?'#1D9E75':'#A32D2D';
+      }
       // Turn save button orange = unsaved changes
       const saveBtn = document.getElementById('btn-salva-rosa');
       if(saveBtn) {
