@@ -602,13 +602,17 @@ function pgFormazione() {
   // Compute lineup with auto-substitution
   function getEffective(slot, role) {
     if(!slot) return null;
-    if(!isElim(slot.naz)) return {player:slot, sub:false};
-    // Find first bench slot player of same role not eliminated, in slot order
     const benchSlots = formations[viewId+'_'+gk]?.benchSlots || {};
-    const sorted = (benchSlots[role]||[]).filter(Boolean);
-    const sub = sorted.find(p => !isElim(p.naz));
-    if(sub) return {player:sub, sub:true, original:slot};
-    return {player:slot, sub:false, unavailable:true};
+    const bench = (benchSlots[role]||[]).filter(Boolean);
+    const titEliminato = isElim(slot.naz);
+    const titSenzaVoto = !titEliminato && getV(slot)===null;
+    if(!titEliminato && !titSenzaVoto) return {player:slot, sub:false};
+    // Find first bench player not eliminated AND with a voto for this giornata
+    const sub = bench.find(p => !isElim(p.naz) && getV(p)!==null);
+    if(sub) return {player:sub, sub:true, subReason: titEliminato?'elim':'sv', original:slot};
+    if(titEliminato) return {player:slot, sub:false, unavailable:true};
+    // titSenzaVoto but no valid sub available -> show original titolare (0 points, no badge)
+    return {player:slot, sub:false};
   }
 
   const effP = getEffective(slotP, 'P');
@@ -627,12 +631,16 @@ function pgFormazione() {
     const vTotal = p ? getVTotal(p) : null;
     const elim = p && isElim(p.naz);
     const isSub = eff?.sub;
+    const subReason = eff?.subReason;
     const unavail = eff?.unavailable;
+    const noVote = p && !isSub && !elim && v===null;
     const isEmpty = !p;
     const bonus = p ? getBonusIcons(p) : '';
     const voteKey = p ? p.n+'_'+p.naz : '';
-    return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?'border-color:#f0c040':unavail?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
-      ${p ? `<div class="slot-name" style="${isSub?'color:#f0c040':unavail?'color:#ff8888':''}">${isSub?'⬆ ':''}${p.n.split(' ').pop()}</div>
+    const arrowColor = isSub ? (subReason==='sv' ? '#1D9E75' : '#f0c040') : noVote ? '#A32D2D' : '';
+    const arrowSymbol = isSub ? '⬆' : noVote ? '⬇' : '';
+    return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?(subReason==='sv'?'border-color:#1D9E75':'border-color:#f0c040'):unavail?'border-color:#A32D2D':noVote?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
+      ${p ? `<div class="slot-name" style="${arrowColor?`color:${arrowColor}`:''}">${arrowSymbol?arrowSymbol+' ':''}${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
               <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="${locked?'':'text-decoration:underline dotted'}">${vTotal!==null?vTotal:'?'}</div>
               ${bonus?`<div style="font-size:10px;line-height:1">${bonus}</div>`:''}`
@@ -674,7 +682,7 @@ function pgFormazione() {
   h += `<div class="module-selector">`;
   MODULI.forEach(m => h += `<button class="mod-btn ${mod===m?'active':''}" data-mod="${m}" ${locked?'disabled style="opacity:.5"':''}>${m}</button>`);
   h += `</div>
-    <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare · <span style="color:#f0c040">⬆ = sostituto automatico</span></div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare<br><span style="color:#f0c040">⬆ elim.</span> · <span style="color:#1D9E75">⬆ S.V.</span> · <span style="color:#A32D2D">⬇ no voto</span></div>
     <div class="field">
       <div class="field-row">${mkSlot(effP,0,'P')}</div>
       <div class="field-row">${effD.map((e,i)=>mkSlot(e,i,'D')).join('')}</div>
