@@ -244,6 +244,7 @@ L.myId = L.myId ?? null;
 L.giornata = L.giornata ?? 1;
 L.draftRole = L.draftRole ?? 'P';
 L.draftSearch = L.draftSearch ?? '';
+L.votiSearch = L.votiSearch ?? '';
 const saveL = () => localStorage.setItem('sfm26_v4', JSON.stringify(L));
 
 // Dati da Supabase
@@ -1048,15 +1049,18 @@ function openBenchPicker(role) {
   };
 }
 
-function pgVoti() {
-  const gk=L.giornata, vG=voti[gk]||{};
-  let h = `<div class="card">
-    <div class="giornata-selector"><button class="gsel-btn" id="vk-prev">◀</button><span>Voti Giornata ${gk}</span><button class="gsel-btn" id="vk-next">▶</button></div>
-    <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>
-    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Campo e tocca il giocatore.</div>`;
+function buildVotiList(gk, search) {
+  const vG = voti[gk]||{};
+  const s2 = (search||'').toLowerCase().trim();
+  let h = '';
   NAZ.forEach(s => {
+    const nazMatch = s.naz.toLowerCase().includes(s2);
+    const playersToShow = s2 && !nazMatch
+      ? s.g.filter(p => p.n.toLowerCase().includes(s2))
+      : s.g;
+    if(s2 && playersToShow.length===0) return;
     h += `<div class="section-label">${s.flag} ${s.naz}</div>`;
-    s.g.forEach(p => {
+    playersToShow.forEach(p => {
       const key=p.n+'_'+s.naz, val=vG[key]!==undefined?vG[key]:'';
       h += `<div class="player-item">
         <span class="role-badge role-${p.r}">${p.r}</span>
@@ -1065,7 +1069,18 @@ function pgVoti() {
       </div>`;
     });
   });
-  h += `<button class="btn-primary" id="btn-save-voti">Salva voti e calcola punteggi</button></div>`;
+  return h;
+}
+
+function pgVoti() {
+  const gk=L.giornata;
+  let h = `<div class="card">
+    <div class="giornata-selector"><button class="gsel-btn" id="vk-prev">◀</button><span>Voti Giornata ${gk}</span><button class="gsel-btn" id="vk-next">▶</button></div>
+    <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Campo e tocca il giocatore.</div>
+    <input type="text" id="voti-search" class="search-box" placeholder="🔍 Cerca giocatore o nazione..." value="${L.votiSearch||''}" autocomplete="off">
+    <div id="voti-list">${buildVotiList(gk, L.votiSearch)}</div>
+  <button class="btn-primary" id="btn-save-voti">Salva voti e calcola punteggi</button></div>`;
   return h;
 }
 
@@ -1411,6 +1426,15 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
   if(activeTab==='voti') {
     document.getElementById('vk-prev').onclick = () => { if(L.giornata>1){L.giornata--;saveL();paint();} };
     document.getElementById('vk-next').onclick = () => { L.giornata++;saveL();paint(); };
+    const votiSearchEl = document.getElementById('voti-search');
+    if(votiSearchEl) {
+      votiSearchEl.addEventListener('input', e => {
+        L.votiSearch = e.target.value;
+        saveL();
+        const list = document.getElementById('voti-list');
+        if(list) list.innerHTML = buildVotiList(L.giornata, L.votiSearch);
+      });
+    }
     document.getElementById('btn-save-voti')?.addEventListener('click', async () => {
       const btn = document.getElementById('btn-save-voti');
       btn.disabled=true; btn.textContent='Salvo voti...';
