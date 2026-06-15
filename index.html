@@ -254,6 +254,7 @@ let voti = {};
 let eventi = {};
 let formations = {};
 let formLock = {giornata:1, locked:false, auto_lock_at:null};
+let giornateCalcolate = {}; // {giornata: true/false}
 
 const ADMIN_PASSWORD = 'superAD2026';
 function isFormazioneLocked(giornata) {
@@ -272,13 +273,14 @@ const getFlag = naz => NAZ.find(s => s.naz === naz)?.flag || '';
 // LOAD / SAVE SUPABASE
 // ============================================================
 async function loadAll() {
-  const [t, e, v, f, l, ev] = await Promise.all([
+  const [t, e, v, f, l, ev, g] = await Promise.all([
     sbGet('squadre_fm', '&order=id.asc'),
     sbGet('nazioni_eliminate_fm'),
     sbGet('voti_fm'),
     sbGet('formazioni_fm'),
     sbGet('lock_fm'),
-    sbGet('eventi_fm')
+    sbGet('eventi_fm'),
+    sbGet('giornate_fm')
   ]);
   teams = (t||[]).map(x => ({...x, rosa:x.rosa||[], puntiGiornate:x.puntiGiornate||[], puntiTotali:x.puntiTotali||0}));
   eliminated = (e||[]).map(r => r.naz);
@@ -289,6 +291,8 @@ async function loadAll() {
   formations = {};
   (f||[]).forEach(r => { formations[r.team_id+'_'+r.giornata]=r; });
   if(l && l[0]) formLock = {giornata:l[0].giornata, locked:l[0].locked, auto_lock_at:l[0].auto_lock_at};
+  giornateCalcolate = {};
+  (g||[]).forEach(r => { giornateCalcolate[r.giornata] = !!r.calcolata; });
 }
 
 async function saveLock(giornata, locked) {
@@ -325,6 +329,64 @@ async function saveEliminated() {
 async function saveVoti(giornata, votiObj) {
   const rows = Object.entries(votiObj).map(([k,v])=>({giornata, player_key:k, voto:v}));
   if(rows.length) await sbUpsert('voti_fm', rows);
+}
+
+async function saveGiornataCalcolata(giornata, calcolata) {
+  await sbUpsert('giornate_fm', [{giornata, calcolata}]);
+  giornateCalcolate[giornata] = calcolata;
+}
+
+// Recalculate puntiGiornate/puntiTotali for all teams for a given giornata.
+// If the giornata is "calcolata", apply substitution logic (titolari senza voto
+// vengono sostituiti dal primo panchinaro disponibile con voto, in ordine slot).
+async function recalcPunti(gk) {
+  const calcolata = !!giornateCalcolate[gk];
+  const vG = voti[gk]||{};
+  const getV = p => p ? (vG[p.n+'_'+p.naz]??null) : null;
+  for(const t of teams) {
+    const fd = formations[t.id+'_'+gk];
+    if(!fd) continue;
+    const mod=fd.modulo||'4-3-3', form=fd.formazione||{};
+    const np=mod.split('-').map(Number);
+    const sD=(form.D||[]).slice(0,np[0]),sC=(form.C||[]).slice(0,np[1]),sA=(form.A||[]).slice(0,np[2]);
+    const benchSlotsAll = fd.benchSlots||{};
+    let tot=0;
+    const addVote = (p) => {
+      if(!p) return;
+      const pk=p.n+'_'+p.naz;
+      const v=vG[pk];
+      if(v!==undefined){
+        const e=eventi[gk]?.[pk];
+        tot+=parseFloat(v)+calcBonus(e);
+      }
+    };
+    const processRole = (role, slots) => {
+      if(!calcolata) {
+        slots.forEach(addVote);
+        return;
+      }
+      const bench = (benchSlotsAll[role]||[]).filter(Boolean);
+      let benchIdx = 0;
+      slots.forEach(slot => {
+        if(!slot) return;
+        if(getV(slot)!==null) { addVote(slot); return; }
+        // titolare senza voto: cerca primo panchinaro con voto
+        while(benchIdx < bench.length) {
+          const cand = bench[benchIdx];
+          benchIdx++;
+          if(getV(cand)!==null) { addVote(cand); return; }
+        }
+      });
+    };
+    processRole('P', [form.P]);
+    processRole('D', sD);
+    processRole('C', sC);
+    processRole('A', sA);
+    if(!t.puntiGiornate) t.puntiGiornate=[];
+    t.puntiGiornate[gk-1]=Math.round(tot*10)/10;
+    t.puntiTotali=Math.round(t.puntiGiornate.reduce((a,b)=>a+(b||0),0)*10)/10;
+    await saveTeam(t);
+  }
 }
 
 async function saveEventi(giornata, eventiObj) {
@@ -603,9 +665,14 @@ function pgFormazione() {
   // Compute lineup with auto-substitution
   // For each role, determine which titolari have no vote (red down arrow),
   // and which bench players act as their substitutes (green up arrow), in slot order.
+  // This logic only applies once the giornata is marked as "calcolata" (all matches finished).
+  const giornataCalcolata = !!giornateCalcolate[gk];
   const benchSlotsAll = formations[viewId+'_'+gk]?.benchSlots || {};
   const activeSubs = {}; // pkey -> true, for bench players that are substituting
   function computeTitolari(role, slots) {
+    if(!giornataCalcolata) {
+      return slots.map(slot => slot ? {player:slot, noVote:false} : null);
+    }
     const bench = (benchSlotsAll[role]||[]).filter(Boolean);
     let benchIdx = 0;
     return slots.map(slot => {
@@ -955,29 +1022,8 @@ function openVotePopup(playerKey, role) {
       eventi[gk][playerKey] = ev;
       await saveVoti(gk, {[playerKey]: base});
       await saveEventi(gk, {[playerKey]: ev});
-      // Recalculate points for all teams (same logic as Voti tab save)
-      for(const t of teams) {
-        const fd = formations[t.id+'_'+gk];
-        if(!fd) continue;
-        const mod=fd.modulo||'4-3-3', form=fd.formazione||{};
-        const np=mod.split('-').map(Number);
-        const sD=(form.D||[]).slice(0,np[0]),sC=(form.C||[]).slice(0,np[1]),sA=(form.A||[]).slice(0,np[2]);
-        let tot=0;
-        [form.P,...sD,...sC,...sA].forEach(p=>{
-          if(p&&!isElim(p.naz)){
-            const pk=p.n+'_'+p.naz;
-            const v=voti[gk]?.[pk];
-            if(v!==undefined){
-              const e=eventi[gk]?.[pk];
-              tot+=parseFloat(v)+calcBonus(e);
-            }
-          }
-        });
-        if(!t.puntiGiornate) t.puntiGiornate=[];
-        t.puntiGiornate[gk-1]=Math.round(tot*10)/10;
-        t.puntiTotali=Math.round(t.puntiGiornate.reduce((a,b)=>a+(b||0),0)*10)/10;
-        await saveTeam(t);
-      }
+      // Recalculate points for all teams
+      await recalcPunti(gk);
       div.remove(); paint();
     } catch(err) {
       btn.disabled=false; btn.textContent='Salva voto';
@@ -1085,13 +1131,26 @@ function buildVotiList(gk, search) {
 
 function pgVoti() {
   const gk=L.giornata;
+  const calcolata = !!giornateCalcolate[gk];
   let h = `<div class="card">
     <div class="giornata-selector"><button class="gsel-btn" id="vk-prev">◀</button><span>Voti Giornata ${gk}</span><button class="gsel-btn" id="vk-next">▶</button></div>
     <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>
-    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Campo e tocca il giocatore.</div>
-    <input type="text" id="voti-search" class="search-box" placeholder="🔍 Cerca giocatore o nazione..." value="${L.votiSearch||''}" autocomplete="off">
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Campo e tocca il giocatore.</div>`;
+  if(calcolata) {
+    h += `<div style="background:#E1F5EE;color:#0F6E56;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px;text-align:center">
+      ✅ Giornata ${gk} calcolata — sostituzioni attive nel Campo
+      <br><span data-uncalcola="${gk}" style="text-decoration:underline;cursor:pointer;font-size:11px;display:inline-block;margin-top:4px">Annulla calcolo (se ci sono ancora partite/voti da inserire)</span>
+    </div>`;
+  } else {
+    h += `<div style="background:#FFF3CD;color:#856404;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px;text-align:center">
+      ⏳ Giornata non ancora calcolata — inserisci i voti man mano che le partite finiscono
+    </div>`;
+  }
+  h += `<input type="text" id="voti-search" class="search-box" placeholder="🔍 Cerca giocatore o nazione..." value="${L.votiSearch||''}" autocomplete="off">
     <div id="voti-list">${buildVotiList(gk, L.votiSearch)}</div>
-  <button class="btn-primary" id="btn-save-voti">Salva voti e calcola punteggi</button></div>`;
+  <button class="btn-primary" id="btn-save-voti">Salva voti e calcola punteggi</button>
+  ${!calcolata ? `<button class="btn-secondary" id="btn-calcola-giornata" style="width:100%;margin-top:8px">✅ Calcola giornata ${gk} (tutte le partite finite)</button>` : ''}
+  </div>`;
   return h;
 }
 
@@ -1437,6 +1496,31 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
   if(activeTab==='voti') {
     document.getElementById('vk-prev').onclick = () => { if(L.giornata>1){L.giornata--;saveL();paint();} };
     document.getElementById('vk-next').onclick = () => { L.giornata++;saveL();paint(); };
+    document.getElementById('btn-calcola-giornata')?.addEventListener('click', async () => {
+      const gk = L.giornata;
+      if(!confirm(`Confermi che tutte le partite della Giornata ${gk} sono terminate e i voti sono stati inseriti?\n\nDa questo momento i titolari senza voto verranno sostituiti automaticamente dai panchinari disponibili nel calcolo punteggio.`)) return;
+      const btn = document.getElementById('btn-calcola-giornata');
+      btn.disabled=true; btn.textContent='⏳ Calcolo...';
+      try {
+        await saveGiornataCalcolata(gk, true);
+        await recalcPunti(gk);
+        paint();
+      } catch(e) {
+        btn.disabled=false; btn.textContent='✅ Calcola giornata '+gk+' (tutte le partite finite)';
+        alert('Errore: '+e.message);
+      }
+    });
+    document.querySelector('[data-uncalcola]')?.addEventListener('click', async () => {
+      const gk = parseInt(document.querySelector('[data-uncalcola]').dataset.uncalcola);
+      if(!confirm(`Annulla il calcolo della Giornata ${gk}? Le sostituzioni automatiche nel Campo verranno disattivate finché non ricalcoli.`)) return;
+      try {
+        await saveGiornataCalcolata(gk, false);
+        await recalcPunti(gk);
+        paint();
+      } catch(e) {
+        alert('Errore: '+e.message);
+      }
+    });
     const votiSearchEl = document.getElementById('voti-search');
     if(votiSearchEl) {
       votiSearchEl.addEventListener('input', e => {
@@ -1458,29 +1542,7 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
       try {
         await saveVoti(gk, voti[gk]);
         btn.textContent='Calcolo punteggi...';
-        // Calcola per ogni squadra
-        for(const t of teams) {
-          const fd = formations[t.id+'_'+gk];
-          if(!fd) continue;
-          const mod=fd.modulo||'4-3-3', form=fd.formazione||{};
-          const np=mod.split('-').map(Number);
-          const sD=(form.D||[]).slice(0,np[0]),sC=(form.C||[]).slice(0,np[1]),sA=(form.A||[]).slice(0,np[2]);
-          let tot=0;
-          [form.P,...sD,...sC,...sA].forEach(p=>{
-            if(p&&!isElim(p.naz)){
-              const pk=p.n+'_'+p.naz;
-              const v=voti[gk]?.[pk];
-              if(v!==undefined){
-                const e=eventi[gk]?.[pk];
-                tot+=parseFloat(v)+calcBonus(e);
-              }
-            }
-          });
-          if(!t.puntiGiornate) t.puntiGiornate=[];
-          t.puntiGiornate[gk-1]=Math.round(tot*10)/10;
-          t.puntiTotali=Math.round(t.puntiGiornate.reduce((a,b)=>a+(b||0),0)*10)/10;
-          await saveTeam(t);
-        }
+        await recalcPunti(gk);
         alert('Voti salvati! Punteggi aggiornati per tutti.');
         btn.disabled=false; btn.textContent='Salva voti e calcola punteggi';
         paint();
