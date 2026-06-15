@@ -527,35 +527,35 @@ function pgDraft() {
 }
 
 
-function buildPlayerList(rosa, role, search) {
-  // Normalize names for tolerant matching: accents, ø/Ø, jr/junior, abbreviations
-  const norm = s => (s||'')
-    .replace(/[øØ]/g,'o')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .toLowerCase().trim()
-    .replace(/\bjr\b\.?/g,'junior');
-  const namesMatch = (a, b) => {
-    const na=norm(a), nb=norm(b);
-    if(na===nb) return true;
-    const wordsA = na.split(/\s+/), wordsB = nb.split(/\s+/);
-    const lastA = wordsA[wordsA.length-1].replace('.',''), lastB = wordsB[wordsB.length-1].replace('.','');
-    const firstA = wordsA[0].replace('.',''), firstB = wordsB[0].replace('.','');
-    // "Messi" (1 word) vs "Lionel Messi" (2 words): single word must equal the SURNAME (last word) of the other
-    if(wordsA.length===1 && wordsB.length>1) return na===lastB;
-    if(wordsB.length===1 && wordsA.length>1) return nb===lastA;
-    // Suffix match for multi-word: "Vinicius Junior" vs "Junior" already covered above; here both >1 word
-    if(na.endsWith(' '+nb) || nb.endsWith(' '+na)) return true;
-    // "Costa D." vs "Diogo Costa": last word is an initial
-    if(lastA.length===1 && firstB[0]===lastA && firstA===lastB) return true;
-    if(lastB.length===1 && firstA[0]===lastB && firstB===lastA) return true;
-    // "B. Fernandes" vs "Bruno Fernandes": first word is a single-letter initial + same surname
-    if(lastA===lastB && lastA.length>2) {
-      if(firstA.length===1 && firstA[0]===firstB[0]) return true;
-      if(firstB.length===1 && firstB[0]===firstA[0]) return true;
-    }
-    return false;
-  };
+// Normalize names for tolerant matching: accents, ø/Ø, jr/junior, abbreviations
+const norm = s => (s||'')
+  .replace(/[øØ]/g,'o')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toLowerCase().trim()
+  .replace(/\bjr\b\.?/g,'junior');
+const namesMatch = (a, b) => {
+  const na=norm(a), nb=norm(b);
+  if(na===nb) return true;
+  const wordsA = na.split(/\s+/), wordsB = nb.split(/\s+/);
+  const lastA = wordsA[wordsA.length-1].replace('.',''), lastB = wordsB[wordsB.length-1].replace('.','');
+  const firstA = wordsA[0].replace('.',''), firstB = wordsB[0].replace('.','');
+  // "Messi" (1 word) vs "Lionel Messi" (2 words): single word must equal the SURNAME (last word) of the other
+  if(wordsA.length===1 && wordsB.length>1) return na===lastB;
+  if(wordsB.length===1 && wordsA.length>1) return nb===lastA;
+  // Suffix match for multi-word: "Vinicius Junior" vs "Junior" already covered above; here both >1 word
+  if(na.endsWith(' '+nb) || nb.endsWith(' '+na)) return true;
+  // "Costa D." vs "Diogo Costa": last word is an initial
+  if(lastA.length===1 && firstB[0]===lastA && firstA===lastB) return true;
+  if(lastB.length===1 && firstA[0]===lastB && firstB===lastA) return true;
+  // "B. Fernandes" vs "Bruno Fernandes": first word is a single-letter initial + same surname
+  if(lastA===lastB && lastA.length>2) {
+    if(firstA.length===1 && firstA[0]===firstB[0]) return true;
+    if(firstB.length===1 && firstB[0]===firstA[0]) return true;
+  }
+  return false;
+};
 
+function buildPlayerList(rosa, role, search) {
   const myId = L.myId;
 
   let players = [];
@@ -1098,9 +1098,13 @@ function buildVotiList(gk, search) {
     playersToShow.forEach(p => {
       const key=p.n+'_'+s.naz, val=vG[key]!==undefined?vG[key]:'';
       const hasVote = val!=='';
+      const owner = teams.find(t => (t.rosa||[]).some(r => norm(r.naz)===norm(s.naz) && namesMatch(r.n,p.n)));
       h += `<div class="player-item" style="${hasVote?'background:#E1F5EE':''}">
         <span class="role-badge role-${p.r}">${p.r}</span>
-        <div class="player-info"><div class="player-name">${p.n}</div></div>
+        <div class="player-info">
+          <div class="player-name">${p.n}</div>
+          ${owner?`<div class="player-nation" style="color:#1D9E75">${owner.name}</div>`:''}
+        </div>
         <input class="vote-input" data-vkey="${key}" value="${val}" placeholder="" type="number" step=".5" min="0" max="10">
       </div>`;
     });
