@@ -1568,7 +1568,7 @@ function attachCheckboxEvents(container) {
     el.onclick = () => {
       if(el.classList.contains('disabled')) return;
       const p = JSON.parse(el.dataset.addp);
-      const mt = teams.find(t=>t.id===viewId) || myTeam(), rosa = mt.rosa||[];
+      const mt = myTeam(), rosa = mt.rosa||[];
       const idx = rosa.findIndex(r => r.n===p.n && r.naz===p.naz);
       if(idx>-1) rosa.splice(idx,1);
       else rosa.push(p);
