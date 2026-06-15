@@ -697,10 +697,11 @@ function pgFormazione() {
     const isEmpty = !p;
     const bonus = p ? getBonusIcons(p) : '';
     const voteKey = p ? p.n+'_'+p.naz : '';
-    return `<div class="player-slot ${p?'filled':''} ${elim?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${noVote?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
-      ${p ? `<div class="slot-name" style="${noVote?'color:#A32D2D':''}">${noVote?'⬇ ':''}${p.n.split(' ').pop()}</div>
+    return `<div class="player-slot ${p?'filled':''} ${elim?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="position:relative;${locked?'cursor:default':''}">
+      ${noVote ? `<div style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#A32D2D;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:1">⬇</div>` : ''}
+      ${p ? `<div class="slot-name">${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
-              <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="${locked?'':'text-decoration:underline dotted'}">${vTotal!==null?vTotal:'?'}</div>
+              <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="color:#fff;${locked?'':'text-decoration:underline dotted'}">${vTotal!==null?vTotal:'?'}</div>
               ${bonus?`<div style="font-size:10px;line-height:1">${bonus}</div>`:''}`
            : `<div class="slot-empty">+${r}</div>`}
     </div>`;
