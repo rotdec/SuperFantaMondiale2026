@@ -601,29 +601,44 @@ function pgFormazione() {
   const panchina = rosa.filter(p => !titolari.some(t => t && t.n===p.n && t.naz===p.naz));
 
   // Compute lineup with auto-substitution
-  function getEffective(slot, role) {
-    if(!slot) return null;
-    const benchSlots = formations[viewId+'_'+gk]?.benchSlots || {};
-    const bench = (benchSlots[role]||[]).filter(Boolean);
-    const titEliminato = isElim(slot.naz);
-    const titSenzaVoto = !titEliminato && getV(slot)===null;
-    if(!titEliminato && !titSenzaVoto) return {player:slot, sub:false};
-    // Find first bench player not eliminated AND with a voto for this giornata
-    const sub = bench.find(p => !isElim(p.naz) && getV(p)!==null);
-    if(sub) return {player:sub, sub:true, subReason: titEliminato?'elim':'sv', original:slot};
-    if(titEliminato) return {player:slot, sub:false, unavailable:true};
-    // titSenzaVoto but no valid sub available -> show original titolare (0 points, no badge)
-    return {player:slot, sub:false};
+  // For each role, determine which titolari have no vote (red down arrow),
+  // and which bench players act as their substitutes (green up arrow), in slot order.
+  const benchSlotsAll = formations[viewId+'_'+gk]?.benchSlots || {};
+  const activeSubs = {}; // pkey -> true, for bench players that are substituting
+  function computeTitolari(role, slots) {
+    const bench = (benchSlotsAll[role]||[]).filter(Boolean);
+    let benchIdx = 0;
+    return slots.map(slot => {
+      if(!slot) return null;
+      const noVote = getV(slot)===null;
+      if(!noVote) return {player:slot, noVote:false};
+      // find next available bench sub with a vote
+      while(benchIdx < bench.length) {
+        const cand = bench[benchIdx];
+        benchIdx++;
+        if(getV(cand)!==null) {
+          activeSubs[cand.n+'_'+cand.naz] = true;
+          return {player:slot, noVote:true, sub:cand};
+        }
+      }
+      return {player:slot, noVote:true, sub:null};
+    });
   }
 
-  const effP = getEffective(slotP, 'P');
-  const effD = sD.map(p => getEffective(p, 'D'));
-  const effC = sC.map(p => getEffective(p, 'C'));
-  const effA = sA.map(p => getEffective(p, 'A'));
+  const effPArr = computeTitolari('P', [slotP]);
+  const effP = effPArr[0];
+  const effD = computeTitolari('D', sD);
+  const effC = computeTitolari('C', sC);
+  const effA = computeTitolari('A', sA);
 
   let tot=0;
   [effP,...effD,...effC,...effA].forEach(e=>{
-    if(e&&e.player&&!e.unavailable){const v=getVTotal(e.player);if(v!==null)tot+=v;}
+    if(!e) return;
+    if(!e.noVote) {
+      const v=getVTotal(e.player); if(v!==null) tot+=v;
+    } else if(e.sub) {
+      const v=getVTotal(e.sub); if(v!==null) tot+=v;
+    }
   });
 
   const mkSlot=(eff,idx,r)=>{
@@ -631,17 +646,12 @@ function pgFormazione() {
     const v = p ? getV(p) : null;
     const vTotal = p ? getVTotal(p) : null;
     const elim = p && isElim(p.naz);
-    const isSub = eff?.sub;
-    const subReason = eff?.subReason;
-    const unavail = eff?.unavailable;
-    const noVote = p && !isSub && !elim && v===null;
+    const noVote = eff?.noVote;
     const isEmpty = !p;
     const bonus = p ? getBonusIcons(p) : '';
     const voteKey = p ? p.n+'_'+p.naz : '';
-    const arrowColor = isSub ? (subReason==='sv' ? '#1D9E75' : '#f0c040') : noVote ? '#A32D2D' : '';
-    const arrowSymbol = isSub ? '⬆' : noVote ? '⬇' : '';
-    return `<div class="player-slot ${p?'filled':''} ${elim&&!isSub?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${isSub?(subReason==='sv'?'border-color:#1D9E75':'border-color:#f0c040'):unavail?'border-color:#A32D2D':noVote?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
-      ${p ? `<div class="slot-name" style="${arrowColor?`color:${arrowColor}`:''}">${arrowSymbol?arrowSymbol+' ':''}${p.n.split(' ').pop()}</div>
+    return `<div class="player-slot ${p?'filled':''} ${elim?'eliminated':''}" ${locked?'':`data-fslot="${r}" data-idx="${idx}"`} style="${noVote?'border-color:#A32D2D':''}${locked?';cursor:default':''}">
+      ${p ? `<div class="slot-name" style="${noVote?'color:#A32D2D':''}">${noVote?'⬇ ':''}${p.n.split(' ').pop()}</div>
               <div class="slot-nation">${p.flag||getFlag(p.naz)}</div>
               <div class="slot-vote" ${locked?'':`data-votekey="${voteKey}" data-voterole="${r}"`} style="${locked?'':'text-decoration:underline dotted'}">${vTotal!==null?vTotal:'?'}</div>
               ${bonus?`<div style="font-size:10px;line-height:1">${bonus}</div>`:''}`
@@ -683,7 +693,7 @@ function pgFormazione() {
   h += `<div class="module-selector">`;
   MODULI.forEach(m => h += `<button class="mod-btn ${mod===m?'active':''}" data-mod="${m}" ${locked?'disabled style="opacity:.5"':''}>${m}</button>`);
   h += `</div>
-    <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare<br><span style="color:#f0c040">⬆ elim.</span> · <span style="color:#1D9E75">⬆ S.V.</span> · <span style="color:#A32D2D">⬇ no voto</span></div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Tocca uno slot per assegnare<br><span style="color:#A32D2D">⬇ titolare senza voto</span> · <span style="color:#1D9E75">⬆ panchinaro entrato</span></div>
     <div class="field">
       <div class="field-row">${mkSlot(effP,0,'P')}</div>
       <div class="field-row">${effD.map((e,i)=>mkSlot(e,i,'D')).join('')}</div>
@@ -754,11 +764,12 @@ function pgFormazione() {
           const elim = isElim(p.naz);
           const bonus = getBonusIcons(p);
           const voteKey = p.n+'_'+p.naz;
-          h += `<div class="player-item" style="${elim?'opacity:.45':''}">
+          const isActiveSub = !!activeSubs[voteKey];
+          h += `<div class="player-item" style="${elim&&!isActiveSub?'opacity:.45':''}">
             <span style="font-size:11px;color:#888;min-width:16px;text-align:center;font-weight:600">${i+1}</span>
             <span class="role-badge role-${p.r}">${p.r}</span>
             <div class="player-info">
-              <div class="player-name">${p.n}</div>
+              <div class="player-name" style="${isActiveSub?'color:#1D9E75':''}">${isActiveSub?'⬆ ':''}${p.n}</div>
               <div class="player-nation">${p.flag||getFlag(p.naz)} ${p.naz}${elim?'<span class="eliminated-badge">ELIM</span>':''}</div>
             </div>
             <span style="font-size:11px;margin-right:4px">${bonus}</span>
