@@ -103,26 +103,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .rosa-pill.A{border-color:#A32D2D;color:#A32D2D}
 .spinner{display:inline-block;width:20px;height:20px;border:3px solid #e0e0d8;border-top-color:#1D9E75;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media(prefers-color-scheme:dark){
-  body{background:#1a1a1a;color:#f0f0f0}
-  .topbar,.tabs,.card,.modal-sheet{background:#2a2a2a;border-color:#3a3a3a}
-  .team-card{background:#333;border-color:#444}
-  .team-card.selected{background:#0f3d2a;border-color:#1D9E75}
-  .search-box,.input-field{background:#333;border-color:#444;color:#f0f0f0}
-  .vote-input,.quota-box,.rosa-view{background:#333}
-  .gsel-btn{background:#333;color:#f0f0f0}
-  .mod-btn,.role-btn,.btn-secondary{color:#f0f0f0;border-color:#444}
-  .player-item,.classifica-row,.score-total{border-color:#3a3a3a}
-  .bench-arrow{background:#333 !important;color:#f0f0f0}
-  .rosa-pill{background:#444;border-color:#555}
-  .player-name,.player-nation{color:#f0f0f0}
-  .player-nation{color:#aaa}
-  .section-label{color:#aaa}
-  #draft-card .player-item{background:#2a2a2a}
-  .bonus-row{background:#333}
-  .bonus-toggle-inactive{background:#3a3a3a;color:#ccc;border-color:#555}
-  .bonus-counter-btn{background:#3a3a3a;color:#1D9E75;border-color:#555}
-}
 </style>
 </head>
 <body>
@@ -134,7 +114,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="tabs">
     <div class="tab active" data-tab="squadre">Squadre</div>
     <div class="tab" data-tab="draft">Rosa</div>
-    <div class="tab" data-tab="formazione">Campo</div>
+    <div class="tab" data-tab="formazione">Formazione</div>
     <div class="tab" data-tab="voti">Voti</div>
     <div class="tab" data-tab="rose">Tutte le rose</div>
     <div class="tab" data-tab="classifica">Class.</div>
@@ -1135,10 +1115,10 @@ function pgVoti() {
   let h = `<div class="card">
     <div class="giornata-selector"><button class="gsel-btn" id="vk-prev">◀</button><span>Voti Giornata ${gk}</span><button class="gsel-btn" id="vk-next">▶</button></div>
     <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>
-    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Campo e tocca il giocatore.</div>`;
+    <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Formazione e tocca il giocatore.</div>`;
   if(calcolata) {
     h += `<div style="background:#E1F5EE;color:#0F6E56;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px;text-align:center">
-      ✅ Giornata ${gk} calcolata — sostituzioni attive nel Campo
+      ✅ Giornata ${gk} calcolata — sostituzioni attive nel tab Formazione
       <br><span data-uncalcola="${gk}" style="text-decoration:underline;cursor:pointer;font-size:11px;display:inline-block;margin-top:4px">Annulla calcolo (se ci sono ancora partite/voti da inserire)</span>
     </div>`;
   } else {
@@ -1512,7 +1492,7 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
     });
     document.querySelector('[data-uncalcola]')?.addEventListener('click', async () => {
       const gk = parseInt(document.querySelector('[data-uncalcola]').dataset.uncalcola);
-      if(!confirm(`Annulla il calcolo della Giornata ${gk}? Le sostituzioni automatiche nel Campo verranno disattivate finché non ricalcoli.`)) return;
+      if(!confirm(`Annulla il calcolo della Giornata ${gk}? Le sostituzioni automatiche nel tab Formazione verranno disattivate finché non ricalcoli.`)) return;
       try {
         await saveGiornataCalcolata(gk, false);
         await recalcPunti(gk);
