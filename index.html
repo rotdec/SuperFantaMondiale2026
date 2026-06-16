@@ -392,6 +392,37 @@ function calcBonus(e) {
   return b;
 }
 
+// Global version of bonus icons, takes an eventi row directly (not tied to pgFormazione's local scope)
+function getBonusIconsGlobal(e) {
+  if(!e) return '';
+  let icons = '';
+  for(let i=0;i<(e.gol||0);i++) icons += '⚽';
+  for(let i=0;i<(e.assist||0);i++) icons += '👟';
+  for(let i=0;i<(e.rigore_segnato||0);i++) icons += '🎯';
+  for(let i=0;i<(e.rigore_sbagliato||0);i++) icons += '❌';
+  for(let i=0;i<(e.rigore_parato||0);i++) icons += '🧤';
+  if(e.ammonizione) icons += '🟨';
+  if(e.espulsione) icons += '🟥';
+  if(e.porta_inviolata) icons += '🛡️';
+  for(let i=0;i<(e.gol_subiti||0);i++) icons += '😬';
+  return icons;
+}
+
+function getBonusIconsGlobal(e) {
+  if(!e) return '';
+  let icons = '';
+  for(let i=0;i<(e.gol||0);i++) icons += '⚽';
+  for(let i=0;i<(e.assist||0);i++) icons += '👟';
+  for(let i=0;i<(e.rigore_segnato||0);i++) icons += '🎯';
+  for(let i=0;i<(e.rigore_sbagliato||0);i++) icons += '❌';
+  for(let i=0;i<(e.rigore_parato||0);i++) icons += '🧤';
+  if(e.ammonizione) icons += '🟨';
+  if(e.espulsione) icons += '🟥';
+  if(e.porta_inviolata) icons += '🛡️';
+  for(let i=0;i<(e.gol_subiti||0);i++) icons += '😬';
+  return icons;
+}
+
 // ============================================================
 // RENDER
 // ============================================================
@@ -1101,13 +1132,17 @@ function buildVotiList(gk, search) {
       const key=p.n+'_'+s.naz, val=vG[key]!==undefined?vG[key]:'';
       const hasVote = val!=='';
       const owner = teams.find(t => (t.rosa||[]).some(r => norm(r.naz)===norm(s.naz) && namesMatch(r.n,p.n)));
+      const ev = (eventi[gk]||{})[key];
+      const bonus = getBonusIconsGlobal(ev);
       h += `<div class="player-item" style="${hasVote?'background:#E1F5EE':''}">
         <span class="role-badge role-${p.r}">${p.r}</span>
         <div class="player-info">
           <div class="player-name">${p.n}</div>
           ${owner?`<div class="player-nation" style="color:#1D9E75">${owner.name}</div>`:''}
         </div>
+        <span style="font-size:11px;margin-right:4px">${bonus}</span>
         <input class="vote-input" data-vkey="${key}" value="${val}" placeholder="" type="number" step=".5" min="0" max="10">
+        <button class="btn-secondary" data-bonusedit="${key}" data-bonusrole="${p.r}" style="font-size:11px;padding:5px 8px;margin-left:4px">Bonus</button>
       </div>`;
     });
   });
@@ -1522,6 +1557,9 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
           const row = inp.closest('.player-item');
           if(row) row.style.background = inp.value!=='' ? '#E1F5EE' : '';
         });
+      });
+      document.querySelectorAll('[data-bonusedit]').forEach(btn => {
+        btn.onclick = () => openVotePopup(btn.dataset.bonusedit, btn.dataset.bonusrole);
       });
     }
     document.getElementById('btn-save-voti')?.addEventListener('click', async () => {
