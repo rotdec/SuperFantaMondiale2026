@@ -206,6 +206,130 @@ const NAZ = [
   {naz:"Uzbekistan",flag:"🇺🇿",g:[{n:"Utkir Yusupov",r:"P"},{n:"Abduvohid Nematov",r:"P"},{n:"Botirali Ergashev",r:"P"},{n:"Rustam Ashurmatov",r:"D"},{n:"Farrukh Sayfiev",r:"D"},{n:"Khojiakbar Alijonov",r:"D"},{n:"Sherzod Nasrullaev",r:"D"},{n:"Umar Eshmurodov",r:"D"},{n:"Abdukodir Khusanov",r:"D"},{n:"Abdulla Abdullaev",r:"D"},{n:"Bekhruz Karimov",r:"D"},{n:"Jakhongir Urozov",r:"D"},{n:"Avazbek Ulmasaliev",r:"D"},{n:"Otabek Shukurov",r:"C"},{n:"Jaloliddin Masharipov",r:"C"},{n:"Odiljon Hamrobekov",r:"C"},{n:"Oston Urunov",r:"C"},{n:"Jamshid Iskanderov",r:"C"},{n:"Dostonbek Khamdamov",r:"C"},{n:"Abbosbek Fayzullaev",r:"C"},{n:"Akmal Mozgovoy",r:"C"},{n:"Azizjon Ganiev",r:"C"},{n:"Sherzod Esanov",r:"C"},{n:"Eldor Shomurodov",r:"A"},{n:"Igor Sergeev",r:"A"},{n:"Azizbek Amonov",r:"A"}]},
 ];
 
+const CALENDARIO = {
+  1: [
+    {data:'11 giu',ora:'21:00',g:'A',casa:'Messico',ospite:'Sudafrica',ris:'2-0'},
+    {data:'12 giu',ora:'04:00',g:'A',casa:'Corea del Sud',ospite:'Rep. Ceca',ris:'2-1'},
+    {data:'12 giu',ora:'21:00',g:'B',casa:'Canada',ospite:'Bosnia-Erzegovina',ris:'1-1'},
+    {data:'13 giu',ora:'03:00',g:'D',casa:'Stati Uniti',ospite:'Paraguay',ris:'4-1'},
+    {data:'13 giu',ora:'21:00',g:'B',casa:'Qatar',ospite:'Svizzera',ris:'1-1'},
+    {data:'14 giu',ora:'00:00',g:'C',casa:'Brasile',ospite:'Marocco',ris:'1-1'},
+    {data:'14 giu',ora:'03:00',g:'C',casa:'Haiti',ospite:'Scozia',ris:'0-1'},
+    {data:'14 giu',ora:'06:00',g:'D',casa:'Australia',ospite:'Turchia',ris:'2-0'},
+    {data:'14 giu',ora:'19:00',g:'E',casa:'Germania',ospite:'Curaçao',ris:'7-1'},
+    {data:'14 giu',ora:'22:00',g:'F',casa:'Paesi Bassi',ospite:'Giappone',ris:'2-2'},
+    {data:'15 giu',ora:'01:00',g:'E',casa:'Costa d\'Avorio',ospite:'Ecuador',ris:'1-0'},
+    {data:'15 giu',ora:'04:00',g:'F',casa:'Svezia',ospite:'Tunisia',ris:'5-1'},
+    {data:'15 giu',ora:'18:00',g:'H',casa:'Spagna',ospite:'Capo Verde',ris:'0-0'},
+    {data:'15 giu',ora:'21:00',g:'G',casa:'Belgio',ospite:'Egitto',ris:'1-1'},
+    {data:'16 giu',ora:'00:00',g:'H',casa:'Arabia Saudita',ospite:'Uruguay',ris:'1-1'},
+    {data:'16 giu',ora:'03:00',g:'G',casa:'Iran',ospite:'Nuova Zelanda',ris:'2-2'},
+    {data:'16 giu',ora:'21:00',g:'I',casa:'Francia',ospite:'Senegal',ris:'3-1'},
+    {data:'17 giu',ora:'00:00',g:'I',casa:'Iraq',ospite:'Norvegia',ris:'1-4'},
+    {data:'17 giu',ora:'03:00',g:'J',casa:'Argentina',ospite:'Algeria',ris:'3-0'},
+    {data:'17 giu',ora:'06:00',g:'J',casa:'Austria',ospite:'Giordania',ris:'3-1'},
+    {data:'17 giu',ora:'19:00',g:'K',casa:'Portogallo',ospite:'RD Congo',ris:'1-1'},
+    {data:'17 giu',ora:'22:00',g:'L',casa:'Inghilterra',ospite:'Croazia',ris:'4-2'},
+    {data:'18 giu',ora:'01:00',g:'L',casa:'Ghana',ospite:'Panama'},
+    {data:'18 giu',ora:'04:00',g:'K',casa:'Uzbekistan',ospite:'Colombia'},
+  ],
+  2: [
+    {data:'18 giu',ora:'18:00',g:'A',casa:'Rep. Ceca',ospite:'Sudafrica'},
+    {data:'18 giu',ora:'21:00',g:'B',casa:'Svizzera',ospite:'Bosnia-Erzegovina'},
+    {data:'19 giu',ora:'00:00',g:'B',casa:'Canada',ospite:'Qatar'},
+    {data:'19 giu',ora:'03:00',g:'A',casa:'Messico',ospite:'Corea del Sud'},
+    {data:'19 giu',ora:'21:00',g:'D',casa:'Stati Uniti',ospite:'Australia'},
+    {data:'20 giu',ora:'00:00',g:'C',casa:'Scozia',ospite:'Marocco'},
+    {data:'20 giu',ora:'02:30',g:'C',casa:'Brasile',ospite:'Haiti'},
+    {data:'20 giu',ora:'05:00',g:'D',casa:'Turchia',ospite:'Paraguay'},
+    {data:'20 giu',ora:'19:00',g:'F',casa:'Paesi Bassi',ospite:'Svezia'},
+    {data:'20 giu',ora:'22:00',g:'E',casa:'Germania',ospite:'Costa d\'Avorio'},
+    {data:'21 giu',ora:'02:00',g:'E',casa:'Ecuador',ospite:'Curaçao'},
+    {data:'21 giu',ora:'06:00',g:'F',casa:'Tunisia',ospite:'Giappone'},
+    {data:'21 giu',ora:'18:00',g:'H',casa:'Spagna',ospite:'Arabia Saudita'},
+    {data:'21 giu',ora:'21:00',g:'G',casa:'Belgio',ospite:'Iran'},
+    {data:'22 giu',ora:'00:00',g:'H',casa:'Uruguay',ospite:'Capo Verde'},
+    {data:'22 giu',ora:'03:00',g:'G',casa:'Nuova Zelanda',ospite:'Egitto'},
+    {data:'22 giu',ora:'19:00',g:'J',casa:'Argentina',ospite:'Austria'},
+    {data:'22 giu',ora:'23:00',g:'I',casa:'Francia',ospite:'Iraq'},
+    {data:'23 giu',ora:'02:00',g:'I',casa:'Norvegia',ospite:'Senegal'},
+    {data:'23 giu',ora:'05:00',g:'J',casa:'Giordania',ospite:'Algeria'},
+    {data:'23 giu',ora:'19:00',g:'K',casa:'Portogallo',ospite:'Uzbekistan'},
+    {data:'23 giu',ora:'22:00',g:'L',casa:'Inghilterra',ospite:'Ghana'},
+    {data:'24 giu',ora:'01:00',g:'L',casa:'Panama',ospite:'Croazia'},
+    {data:'24 giu',ora:'04:00',g:'K',casa:'Colombia',ospite:'RD Congo'},
+  ],
+  3: [
+    {data:'24 giu',ora:'21:00',g:'B',casa:'Svizzera',ospite:'Canada'},
+    {data:'24 giu',ora:'21:00',g:'B',casa:'Bosnia-Erzegovina',ospite:'Qatar'},
+    {data:'25 giu',ora:'00:00',g:'C',casa:'Marocco',ospite:'Haiti'},
+    {data:'25 giu',ora:'00:00',g:'C',casa:'Scozia',ospite:'Brasile'},
+    {data:'25 giu',ora:'03:00',g:'A',casa:'Rep. Ceca',ospite:'Messico'},
+    {data:'25 giu',ora:'03:00',g:'A',casa:'Sudafrica',ospite:'Corea del Sud'},
+    {data:'25 giu',ora:'22:00',g:'E',casa:'Curaçao',ospite:'Costa d\'Avorio'},
+    {data:'25 giu',ora:'22:00',g:'E',casa:'Ecuador',ospite:'Germania'},
+    {data:'26 giu',ora:'01:00',g:'F',casa:'Giappone',ospite:'Svezia'},
+    {data:'26 giu',ora:'01:00',g:'F',casa:'Tunisia',ospite:'Paesi Bassi'},
+    {data:'26 giu',ora:'04:00',g:'D',casa:'Turchia',ospite:'Stati Uniti'},
+    {data:'26 giu',ora:'04:00',g:'D',casa:'Paraguay',ospite:'Australia'},
+    {data:'26 giu',ora:'21:00',g:'I',casa:'Norvegia',ospite:'Francia'},
+    {data:'26 giu',ora:'21:00',g:'I',casa:'Senegal',ospite:'Iraq'},
+    {data:'27 giu',ora:'02:00',g:'H',casa:'Capo Verde',ospite:'Arabia Saudita'},
+    {data:'27 giu',ora:'02:00',g:'H',casa:'Uruguay',ospite:'Spagna'},
+    {data:'27 giu',ora:'05:00',g:'G',casa:'Egitto',ospite:'Iran'},
+    {data:'27 giu',ora:'05:00',g:'G',casa:'Nuova Zelanda',ospite:'Belgio'},
+    {data:'27 giu',ora:'23:00',g:'L',casa:'Panama',ospite:'Inghilterra'},
+    {data:'27 giu',ora:'23:00',g:'L',casa:'Croazia',ospite:'Ghana'},
+    {data:'28 giu',ora:'01:30',g:'K',casa:'Colombia',ospite:'Portogallo'},
+    {data:'28 giu',ora:'01:30',g:'K',casa:'RD Congo',ospite:'Uzbekistan'},
+    {data:'28 giu',ora:'04:00',g:'J',casa:'Algeria',ospite:'Austria'},
+    {data:'28 giu',ora:'04:00',g:'J',casa:'Giordania',ospite:'Argentina'},
+  ],
+  4: [
+    {data:'29 giu',ora:'22:30',g:'-',casa:'Vincente Gruppo E',ospite:'3° Gr. A/B/C/D/F'},
+    {data:'29 giu',ora:'19:00',g:'-',casa:'Vincente Gruppo C',ospite:'2° Gruppo F'},
+    {data:'28 giu',ora:'21:00',g:'-',casa:'2° Gruppo A',ospite:'2° Gruppo B'},
+    {data:'30 giu',ora:'03:00',g:'-',casa:'Vincente Gruppo F',ospite:'2° Gruppo C'},
+    {data:'30 giu',ora:'03:00',g:'-',casa:'Vincente Gruppo F',ospite:'2° Gruppo C'},
+    {data:'30 giu',ora:'19:00',g:'-',casa:'2° Gruppo E',ospite:'2° Gruppo I'},
+    {data:'30 giu',ora:'23:00',g:'-',casa:'Vincente Gruppo I',ospite:'3° Gr. C/D/F/G/H'},
+    {data:'1 lug',ora:'03:00',g:'-',casa:'Vincente Gruppo A',ospite:'3° Gr. C/E/F/H/I'},
+    {data:'1 lug',ora:'18:00',g:'-',casa:'Vincente Gruppo L',ospite:'3° Gr. E/H/I/J/K'},
+    {data:'1 lug',ora:'22:00',g:'-',casa:'Vincente Gruppo G',ospite:'3° Gr. A/E/H/I/J'},
+    {data:'2 lug',ora:'02:00',g:'-',casa:'Vincente Gruppo D',ospite:'Gr. B/E/F/I/J'},
+    {data:'2 lug',ora:'21:00',g:'-',casa:'Vincente Gruppo H',ospite:'2° Gruppo J'},
+    {data:'3 lug',ora:'01:00',g:'-',casa:'2° Gruppo K',ospite:'2° Gruppo L'},
+    {data:'3 lug',ora:'05:00',g:'-',casa:'Vincente Gruppo B',ospite:'3° Gr. E/F/G/I/J'},
+    {data:'3 lug',ora:'20:00',g:'-',casa:'2° Gruppo D',ospite:'2° Gruppo G'},
+    {data:'4 lug',ora:'00:00',g:'-',casa:'Vincente Gruppo J',ospite:'2° Gruppo H'},
+    {data:'4 lug',ora:'03:30',g:'-',casa:'Vincente Gruppo K',ospite:'3° Gr. D/E/I/J/L'},
+  ],
+  5: [
+    {data:'4 lug',ora:'19:00',g:'-',casa:'Vinc. Partita 73',ospite:'Vinc. Partita 75'},
+    {data:'4 lug',ora:'23:00',g:'-',casa:'Vinc. Partita 74',ospite:'Vinc. Partita 77'},
+    {data:'5 lug',ora:'22:00',g:'-',casa:'Vinc. Partita 76',ospite:'Vinc. Partita 78'},
+    {data:'6 lug',ora:'02:00',g:'-',casa:'Vinc. Partita 79',ospite:'Vinc. Partita 80'},
+    {data:'6 lug',ora:'21:00',g:'-',casa:'Vinc. Partita 83',ospite:'Vinc. Partita 84'},
+    {data:'7 lug',ora:'02:00',g:'-',casa:'Vinc. Partita 81',ospite:'Vinc. Partita 82'},
+    {data:'7 lug',ora:'18:00',g:'-',casa:'Vinc. Partita 86',ospite:'Vinc. Partita 88'},
+    {data:'7 lug',ora:'22:00',g:'-',casa:'Vinc. Partita 85',ospite:'Vinc. Partita 87'},
+  ],
+  6: [
+    {data:'9 lug',ora:'22:00',g:'-',casa:'Vinc. Partita 89',ospite:'Vinc. Partita 90'},
+    {data:'10 lug',ora:'21:00',g:'-',casa:'Vinc. Partita 93',ospite:'Vinc. Partita 94'},
+    {data:'11 lug',ora:'23:00',g:'-',casa:'Vinc. Partita 91',ospite:'Vinc. Partita 92'},
+    {data:'12 lug',ora:'03:00',g:'-',casa:'Vinc. Partita 95',ospite:'Vinc. Partita 96'},
+  ],
+  7: [
+    {data:'14 lug',ora:'21:00',g:'-',casa:'Vinc. Partita 97',ospite:'Vinc. Partita 98'},
+    {data:'15 lug',ora:'21:00',g:'-',casa:'Vinc. Partita 99',ospite:'Vinc. Partita 100'},
+  ],
+  8: [
+    {data:'18 lug',ora:'23:00',g:'-',casa:'Perdente Sf1',ospite:'Perdente Sf2'},
+    {data:'19 lug',ora:'21:00',g:'-',casa:'Vincente Sf1',ospite:'Vincente Sf2'},
+  ],
+};
+
 const QUOTA_MIN={P:12,D:14,C:14,A:12};
 const QUOTA_MAX={P:16,D:15,C:15,A:13};
 
@@ -227,6 +351,7 @@ L.giornata = L.giornata ?? 1;
 L.draftRole = L.draftRole ?? 'P';
 L.draftSearch = L.draftSearch ?? '';
 L.votiSearch = L.votiSearch ?? '';
+L.calExpanded = L.calExpanded ?? false;
 const saveL = () => localStorage.setItem('sfm26_v4', JSON.stringify(L));
 
 // Dati da Supabase
@@ -738,7 +863,8 @@ function pgFormazione() {
   };
 
   // Team viewer selector
-  let h = `<div class="card" style="padding-bottom:10px">
+  let h = buildCalendarioBlock(gk, !!L.calExpanded);
+  h += `<div class="card" style="padding-bottom:10px">
     <div style="font-size:11px;color:#888;margin-bottom:6px">Visualizza formazione di:</div>
     <select id="team-viewer" class="input-field" style="margin-bottom:0">`;
   teams.forEach(t => h += `<option value="${t.id}" ${t.id===viewId?'selected':''}>${t.id===L.myId?'👑 ':''}${t.name}</option>`);
@@ -1199,6 +1325,35 @@ function pgRose() {
   return h;
 }
 
+const FASE_LABELS = {1:'1° turno gironi',2:'2° turno gironi',3:'3° turno gironi',4:'Sedicesimi di finale',5:'Ottavi di finale',6:'Quarti di finale',7:'Semifinali',8:'Finale 3°/4° posto e Finale'};
+
+function buildCalendarioBlock(gk, expanded) {
+  const matches = CALENDARIO[gk] || [];
+  let inner = '';
+  let lastDate = null;
+  matches.forEach(m => {
+    if (m.data !== lastDate) {
+      inner += `<div class="section-label">${m.data}</div>`;
+      lastDate = m.data;
+    }
+    inner += `<div class="player-item">
+      <div class="player-info">
+        <div class="player-name">${m.casa} - ${m.ospite}</div>
+        <div class="player-nation">${m.g!=='-' ? 'Girone '+m.g+' · ' : ''}${m.ora}</div>
+      </div>
+      ${m.ris ? `<span style="font-weight:700;color:#1D9E75">${m.ris}</span>` : `<span style="font-size:11px;color:#888">da giocare</span>`}
+    </div>`;
+  });
+  if (!matches.length) inner = `<div style="text-align:center;color:#888;padding:10px">Nessuna partita disponibile per questa fase.</div>`;
+  return `<div class="card" style="margin-bottom:10px">
+    <div id="cal-toggle" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+      <div><span style="font-weight:600">📅 Partite Giornata ${gk}</span> <span style="font-size:11px;color:#1D9E75">${FASE_LABELS[gk]||''}</span></div>
+      <span style="font-size:18px">${expanded?'▲':'▼'}</span>
+    </div>
+    ${expanded ? `<div style="margin-top:10px">${inner}</div>` : ''}
+  </div>`;
+}
+
 function pgClassifica() {
   const sorted = [...teams].sort((a,b)=>b.puntiTotali-a.puntiTotali);
   let h = `<div class="card"><div class="card-title">Classifica</div>`;
@@ -1392,6 +1547,11 @@ function bindEvents() {
   }
 
   if(activeTab==='formazione') {
+    document.getElementById('cal-toggle')?.addEventListener('click', () => {
+      L.calExpanded = !L.calExpanded;
+      saveL();
+      paint();
+    });
     document.getElementById('team-viewer')?.addEventListener('change', (e) => {
       L.viewTeamId = parseInt(e.target.value);
       paint();
