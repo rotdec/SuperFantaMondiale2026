@@ -352,6 +352,7 @@ L.draftRole = L.draftRole ?? 'P';
 L.draftSearch = L.draftSearch ?? '';
 L.votiSearch = L.votiSearch ?? '';
 L.calExpanded = L.calExpanded ?? false;
+L.clasGiornata = L.clasGiornata ?? 1;
 const saveL = () => localStorage.setItem('sfm26_v4', JSON.stringify(L));
 
 // Dati da Supabase
@@ -1355,8 +1356,11 @@ function buildCalendarioBlock(gk, expanded) {
 }
 
 function pgClassifica() {
+  const gk = L.clasGiornata || 1;
+
+  // Classifica generale
   const sorted = [...teams].sort((a,b)=>b.puntiTotali-a.puntiTotali);
-  let h = `<div class="card"><div class="card-title">Classifica</div>`;
+  let h = `<div class="card"><div class="card-title">Classifica Generale</div>`;
   sorted.forEach((t,i) => {
     const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
     h += `<div class="classifica-row">
@@ -1365,7 +1369,38 @@ function pgClassifica() {
       <div style="text-align:right"><div class="team-pts">${(t.puntiTotali||0).toFixed(1)}</div><div style="font-size:10px;color:#888">pt</div></div>
     </div>`;
   });
-  return h + '</div>';
+  h += `</div>`;
+
+  // Classifica giornata
+  const sortedG = [...teams]
+    .map(t => ({...t, ptG: (t.puntiGiornate||[])[gk-1]||0}))
+    .sort((a,b) => b.ptG - a.ptG);
+  const best = sortedG[0]?.ptG || 0;
+
+  h += `<div class="card" style="margin-top:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin:0">Classifica Giornata</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="gsel-btn" id="clas-prev">◀</button>
+        <span style="font-weight:600">G${gk}</span>
+        <button class="gsel-btn" id="clas-next">▶</button>
+      </div>
+    </div>`;
+  sortedG.forEach((t,i) => {
+    const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const isBest = t.ptG === best && best > 0;
+    h += `<div class="classifica-row">
+      <div class="pos-badge ${pc}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
+      <div style="flex:1"><div style="font-size:14px;font-weight:600">${t.id===L.myId?'👑 ':''}${t.name}</div><div style="font-size:11px;color:#888">${t.manager}</div></div>
+      <div style="text-align:right">
+        <div class="team-pts">${t.ptG.toFixed(1)}</div>
+        <div style="font-size:10px;color:#888">${isBest?'🏆 miglior g.':''}</div>
+      </div>
+    </div>`;
+  });
+  h += `</div>`;
+
+  return h;
 }
 
 // ============================================================
@@ -1373,6 +1408,11 @@ function pgClassifica() {
 // ============================================================
 function bindEvents() {
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => setTab(t.dataset.tab));
+
+  if(activeTab==='classifica') {
+    document.getElementById('clas-prev')?.addEventListener('click', () => { if(L.clasGiornata>1){L.clasGiornata--;saveL();paint();} });
+    document.getElementById('clas-next')?.addEventListener('click', () => { L.clasGiornata++;saveL();paint(); });
+  }
 
   if(activeTab==='squadre') {
     document.querySelectorAll('.team-card').forEach(el => el.onclick = () => {
