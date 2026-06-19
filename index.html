@@ -352,7 +352,7 @@ L.draftRole = L.draftRole ?? 'P';
 L.draftSearch = L.draftSearch ?? '';
 L.votiSearch = L.votiSearch ?? '';
 L.calExpanded = L.calExpanded ?? false;
-L.clasGiornata = L.clasGiornata ?? 1;
+L.clasView = L.clasView ?? 'generale';
 const saveL = () => localStorage.setItem('sfm26_v4', JSON.stringify(L));
 
 // Dati da Supabase
@@ -1356,50 +1356,50 @@ function buildCalendarioBlock(gk, expanded) {
 }
 
 function pgClassifica() {
-  const gk = L.clasGiornata || 1;
+  const gk = L.clasGiornata ?? L.giornata;
+  const view = L.clasView || 'generale'; // 'generale' or 'giornata'
 
-  // Classifica generale
-  const sorted = [...teams].sort((a,b)=>b.puntiTotali-a.puntiTotali);
-  let h = `<div class="card"><div class="card-title">Classifica Generale</div>`;
-  sorted.forEach((t,i) => {
-    const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
-    h += `<div class="classifica-row">
-      <div class="pos-badge ${pc}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
-      <div style="flex:1"><div style="font-size:14px;font-weight:600">${t.id===L.myId?'👑 ':''}${t.name}</div><div style="font-size:11px;color:#888">${t.manager}</div></div>
-      <div style="text-align:right"><div class="team-pts">${(t.puntiTotali||0).toFixed(1)}</div><div style="font-size:10px;color:#888">pt</div></div>
+  let h = `<div class="card">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn-clas-tab ${view==='generale'?'active':''}" data-clasview="generale" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${view==='generale'?'#1D9E75':'#e0e0d8'};background:${view==='generale'?'#1D9E75':'#fff'};color:${view==='generale'?'#fff':'#333'};font-weight:600;font-size:13px;cursor:pointer">Generale</button>
+      <button class="btn-clas-tab ${view==='giornata'?'active':''}" data-clasview="giornata" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${view==='giornata'?'#1D9E75':'#e0e0d8'};background:${view==='giornata'?'#1D9E75':'#fff'};color:${view==='giornata'?'#fff':'#333'};font-weight:600;font-size:13px;cursor:pointer">Giornata</button>
     </div>`;
-  });
+
+  if(view === 'generale') {
+    const sorted = [...teams].sort((a,b)=>b.puntiTotali-a.puntiTotali);
+    sorted.forEach((t,i) => {
+      const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+      h += `<div class="classifica-row">
+        <div class="pos-badge ${pc}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600">${t.id===L.myId?'👑 ':''}${t.name}</div><div style="font-size:11px;color:#888">${t.manager}</div></div>
+        <div style="text-align:right"><div class="team-pts">${(t.puntiTotali||0).toFixed(1)}</div><div style="font-size:10px;color:#888">pt</div></div>
+      </div>`;
+    });
+  } else {
+    h += `<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px">
+      <button class="gsel-btn" id="clas-prev">◀</button>
+      <span style="font-weight:600;font-size:15px">Giornata ${gk}</span>
+      <button class="gsel-btn" id="clas-next">▶</button>
+    </div>`;
+    const sortedG = [...teams]
+      .map(t => ({...t, ptG: (t.puntiGiornate||[])[gk-1]||0}))
+      .sort((a,b) => b.ptG - a.ptG);
+    const best = sortedG[0]?.ptG || 0;
+    sortedG.forEach((t,i) => {
+      const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+      const isBest = t.ptG === best && best > 0;
+      h += `<div class="classifica-row">
+        <div class="pos-badge ${pc}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600">${t.id===L.myId?'👑 ':''}${t.name}</div><div style="font-size:11px;color:#888">${t.manager}</div></div>
+        <div style="text-align:right">
+          <div class="team-pts">${t.ptG.toFixed(1)}</div>
+          <div style="font-size:10px;color:#1D9E75">${isBest?'🏆 miglior g.':''}</div>
+        </div>
+      </div>`;
+    });
+  }
+
   h += `</div>`;
-
-  // Classifica giornata
-  const sortedG = [...teams]
-    .map(t => ({...t, ptG: (t.puntiGiornate||[])[gk-1]||0}))
-    .sort((a,b) => b.ptG - a.ptG);
-  const best = sortedG[0]?.ptG || 0;
-
-  h += `<div class="card" style="margin-top:10px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div class="card-title" style="margin:0">Classifica Giornata</div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button class="gsel-btn" id="clas-prev">◀</button>
-        <span style="font-weight:600">G${gk}</span>
-        <button class="gsel-btn" id="clas-next">▶</button>
-      </div>
-    </div>`;
-  sortedG.forEach((t,i) => {
-    const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
-    const isBest = t.ptG === best && best > 0;
-    h += `<div class="classifica-row">
-      <div class="pos-badge ${pc}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
-      <div style="flex:1"><div style="font-size:14px;font-weight:600">${t.id===L.myId?'👑 ':''}${t.name}</div><div style="font-size:11px;color:#888">${t.manager}</div></div>
-      <div style="text-align:right">
-        <div class="team-pts">${t.ptG.toFixed(1)}</div>
-        <div style="font-size:10px;color:#888">${isBest?'🏆 miglior g.':''}</div>
-      </div>
-    </div>`;
-  });
-  h += `</div>`;
-
   return h;
 }
 
@@ -1410,8 +1410,11 @@ function bindEvents() {
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => setTab(t.dataset.tab));
 
   if(activeTab==='classifica') {
-    document.getElementById('clas-prev')?.addEventListener('click', () => { if(L.clasGiornata>1){L.clasGiornata--;saveL();paint();} });
-    document.getElementById('clas-next')?.addEventListener('click', () => { L.clasGiornata++;saveL();paint(); });
+    document.querySelectorAll('[data-clasview]').forEach(btn => {
+      btn.addEventListener('click', () => { L.clasView = btn.dataset.clasview; saveL(); paint(); });
+    });
+    document.getElementById('clas-prev')?.addEventListener('click', () => { const gk=L.clasGiornata??L.giornata; if(gk>1){L.clasGiornata=gk-1;saveL();paint();} });
+    document.getElementById('clas-next')?.addEventListener('click', () => { L.clasGiornata=(L.clasGiornata??L.giornata)+1;saveL();paint(); });
   }
 
   if(activeTab==='squadre') {
