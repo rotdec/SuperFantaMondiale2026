@@ -1270,6 +1270,7 @@ function buildVotiList(gk, search) {
         <span style="font-size:11px;margin-right:4px">${bonus}</span>
         <input class="vote-input" data-vkey="${key}" value="${val}" placeholder="" type="number" step=".5" min="0" max="10">
         <button class="btn-secondary" data-bonusedit="${key}" data-bonusrole="${p.r}" style="font-size:11px;padding:5px 8px;margin-left:4px">Bonus</button>
+        ${hasVote?`<button data-deletevoto="${key}" style="font-size:14px;padding:5px 6px;margin-left:4px;background:none;border:none;cursor:pointer;color:#A32D2D" title="Cancella voto">🗑️</button>`:''}
       </div>`;
     });
   });
@@ -1279,10 +1280,18 @@ function buildVotiList(gk, search) {
 function pgVoti() {
   const gk=L.giornata;
   const calcolata = !!giornateCalcolate[gk];
+  const prevCalcolata = gk <= 1 || !!giornateCalcolate[gk-1];
   let h = `<div class="card">
     <div class="giornata-selector"><button class="gsel-btn" id="vk-prev">◀</button><span>Voti Giornata ${gk}</span><button class="gsel-btn" id="vk-next">▶</button></div>
     <div style="font-size:12px;color:#1D9E75;margin-bottom:8px">Voti condivisi — tutti i manager li vedono dopo il salvataggio</div>
     <div style="font-size:11px;color:#888;margin-bottom:8px">Per bonus/malus (gol, assist, cartellini, ecc.) vai nel tab Formazione e tocca il giocatore.</div>`;
+  if(!prevCalcolata) {
+    h += `<div style="background:#FCEBEB;color:#A32D2D;padding:12px;border-radius:8px;text-align:center;font-size:13px">
+      ⛔ Impossibile inserire voti per la Giornata ${gk}<br>
+      <span style="font-size:11px;margin-top:4px;display:block">La Giornata ${gk-1} non è ancora stata calcolata.<br>Calcola prima la giornata precedente dal tab Voti.</span>
+    </div></div>`;
+    return h;
+  }
   if(calcolata) {
     h += `<div style="background:#E1F5EE;color:#0F6E56;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px;text-align:center">
       ✅ Giornata ${gk} calcolata — sostituzioni attive nel tab Formazione
@@ -1763,6 +1772,19 @@ const _isEmptyForm = f => !f || !(f.formazione?.P || (f.formazione?.D||[]).some(
       });
       document.querySelectorAll('[data-bonusedit]').forEach(btn => {
         btn.onclick = () => openVotePopup(btn.dataset.bonusedit, btn.dataset.bonusrole);
+      });
+      document.querySelectorAll('[data-deletevoto]').forEach(btn => {
+        btn.onclick = async () => {
+          const key = btn.dataset.deletevoto;
+          const gk = L.giornata;
+          if(!confirm('Cancellare il voto di '+key.split('_')[0]+'?')) return;
+          await fetch(SB+'/rest/v1/voti_fm?giornata=eq.'+gk+'&player_key=eq.'+encodeURIComponent(key), {method:'DELETE', headers:H});
+          await fetch(SB+'/rest/v1/eventi_fm?giornata=eq.'+gk+'&player_key=eq.'+encodeURIComponent(key), {method:'DELETE', headers:H});
+          if(voti[gk]) delete voti[gk][key];
+          if(eventi[gk]) delete eventi[gk][key];
+          await recalcPunti(gk);
+          paint();
+        };
       });
     }
     document.getElementById('btn-save-voti')?.addEventListener('click', async () => {
