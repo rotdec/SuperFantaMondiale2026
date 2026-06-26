@@ -502,7 +502,7 @@ async function saveEventi(giornata, eventiObj) {
   if(rows.length) await sbUpsert('eventi_fm', rows);
 }
 
-const EMPTY_EVENT = {gol:0,assist:0,ammonizione:false,espulsione:false,rigore_segnato:0,rigore_sbagliato:0,rigore_parato:0,gol_subiti:0,porta_inviolata:false};
+const EMPTY_EVENT = {gol:0,assist:0,ammonizione:false,espulsione:false,rigore_segnato:0,rigore_sbagliato:0,rigore_parato:0,gol_subiti:0,porta_inviolata:false,autogol:0};
 function calcBonus(e) {
   if(!e) return 0;
   let b = 0;
@@ -515,6 +515,7 @@ function calcBonus(e) {
   if(e.espulsione) b -= 1;
   if(e.porta_inviolata) b += 1;
   b += (e.gol_subiti||0)*-1;
+  b += (e.autogol||0)*-2;
   return b;
 }
 
@@ -531,6 +532,7 @@ function getBonusIconsGlobal(e) {
   if(e.espulsione) icons += '🟥';
   if(e.porta_inviolata) icons += '🛡️';
   for(let i=0;i<(e.gol_subiti||0);i++) icons += '😬';
+  for(let i=0;i<(e.autogol||0);i++) icons += '🤦';
   return icons;
 }
 
@@ -546,6 +548,7 @@ function getBonusIconsGlobal(e) {
   if(e.espulsione) icons += '🟥';
   if(e.porta_inviolata) icons += '🛡️';
   for(let i=0;i<(e.gol_subiti||0);i++) icons += '😬';
+  for(let i=0;i<(e.autogol||0);i++) icons += '🤦';
   return icons;
 }
 
@@ -789,6 +792,7 @@ function pgFormazione() {
     if(e.espulsione) icons += '🟥';
     if(e.porta_inviolata) icons += '🛡️';
     for(let i=0;i<(e.gol_subiti||0);i++) icons += '😬';
+    for(let i=0;i<(e.autogol||0);i++) icons += '🤦';
     return icons;
   };
   const slotP = form.P||null;
@@ -1074,7 +1078,8 @@ function openVotePopup(playerKey, role) {
     {key:'rigore_segnato', icon:'🎯', label:'Rigore segnato', type:'counter'},
     {key:'rigore_sbagliato', icon:'❌', label:'Rigore sbagliato', type:'counter'},
     {key:'ammonizione', icon:'🟨', label:'Ammonizione', type:'toggle'},
-    {key:'espulsione', icon:'🟥', label:'Espulsione', type:'toggle'}
+    {key:'espulsione', icon:'🟥', label:'Espulsione', type:'toggle'},
+    {key:'autogol', icon:'🤦', label:'Autogol', type:'counter'}
   ];
   if(isGK) {
     bonusDefs.push({key:'rigore_parato', icon:'🧤', label:'Rigore parato', type:'counter'});
