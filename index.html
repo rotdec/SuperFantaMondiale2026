@@ -1435,15 +1435,40 @@ function pgClassifica() {
       </div>`;
     });
   } else {
+    const isCalcolata = !!giornateCalcolate[gk];
+    const isCurrentGk = gk === L.giornata;
     h += `<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px">
       <button class="gsel-btn" id="clas-prev">◀</button>
       <span style="font-weight:600;font-size:15px">Giornata ${gk}</span>
       <button class="gsel-btn" id="clas-next">▶</button>
     </div>`;
+    // For current uncalculated giornata: compute live from voti
+    // For past calculated giornate: use saved puntiGiornate
+    const getPtG = (t) => {
+      if(isCalcolata || !isCurrentGk) return (t.puntiGiornate||[])[gk-1]||0;
+      // Live calculation from voti
+      const fd = formations[t.id+'_'+gk] || formations[t.id+'_'+(gk-1)];
+      if(!fd) return 0;
+      const mod=fd.modulo||'4-3-3', form=fd.formazione||{};
+      const np=mod.split('-').map(Number);
+      const sD=(form.D||[]).slice(0,np[0]),sC=(form.C||[]).slice(0,np[1]),sA=(form.A||[]).slice(0,np[2]);
+      const vG=voti[gk]||{}, eG=eventi[gk]||{};
+      let tot=0;
+      [form.P,...sD,...sC,...sA].forEach(p=>{
+        if(!p) return;
+        const pk=p.n+'_'+p.naz;
+        const v=vG[pk];
+        if(v!==undefined) tot+=parseFloat(v)+calcBonus(eG[pk]);
+      });
+      return Math.round(tot*10)/10;
+    };
     const sortedG = [...teams]
-      .map(t => ({...t, ptG: (t.puntiGiornate||[])[gk-1]||0}))
+      .map(t => ({...t, ptG: getPtG(t)}))
       .sort((a,b) => b.ptG - a.ptG);
     const best = sortedG[0]?.ptG || 0;
+    if(!isCalcolata && isCurrentGk) {
+      h += `<div style="font-size:11px;color:#888;text-align:center;margin-bottom:8px">⏳ Giornata in corso — punteggi provvisori</div>`;
+    }
     sortedG.forEach((t,i) => {
       const pc = i===0?'gold':i===1?'silver':i===2?'bronze':'';
       const isBest = t.ptG === best && best > 0;
