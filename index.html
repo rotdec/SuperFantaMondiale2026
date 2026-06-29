@@ -1299,13 +1299,38 @@ function buildVotiList(gk, search) {
   const s2 = (search||'').toLowerCase().trim();
   let h = '';
   NAZ.forEach(s => {
+    const elim = isElim(s.naz);
     const nazMatch = s.naz.toLowerCase().includes(s2);
-    const playersToShow = s2 && !nazMatch
+    const allPlayers = s2 && !nazMatch
       ? s.g.filter(p => p.n.toLowerCase().includes(s2))
       : s.g;
-    if(s2 && playersToShow.length===0) return;
+    // Only show players that are owned by someone in a rosa
+    const owned = allPlayers.filter(p => teams.some(t => (t.rosa||[]).some(r => norm(r.naz)===norm(s.naz) && namesMatch(r.n,p.n))));
+    if(owned.length===0) return;
+    if(s2 && owned.length===0) return;
+    if(elim) {
+      // Show eliminated nations collapsed/grayed — only if they have existing votes
+      const withVotes = owned.filter(p => vG[p.n+'_'+s.naz]!==undefined);
+      if(withVotes.length===0) return; // hide completely if no votes
+      h += `<div class="section-label" style="opacity:.5">⛔ ${s.flag} ${s.naz} (eliminata)</div>`;
+      withVotes.forEach(p => {
+        const key=p.n+'_'+s.naz, val=vG[key]!==undefined?vG[key]:'';
+        const ev = (eventi[gk]||{})[key];
+        const bonus = getBonusIconsGlobal(ev);
+        h += `<div class="player-item" style="opacity:.5">
+          <span class="role-badge role-${p.r}">${p.r}</span>
+          <div class="player-info">
+            <div class="player-name">${p.n}</div>
+            <div class="player-nation" style="color:#A32D2D">ELIM</div>
+          </div>
+          <span style="font-size:11px;margin-right:4px">${bonus}</span>
+          <span style="font-size:13px;font-weight:700;color:#888;min-width:40px;text-align:right">${val!==''?val:'—'}</span>
+        </div>`;
+      });
+      return;
+    }
     h += `<div class="section-label">${s.flag} ${s.naz}</div>`;
-    playersToShow.forEach(p => {
+    owned.forEach(p => {
       const key=p.n+'_'+s.naz, val=vG[key]!==undefined?vG[key]:'';
       const hasVote = val!=='';
       const owner = teams.find(t => (t.rosa||[]).some(r => norm(r.naz)===norm(s.naz) && namesMatch(r.n,p.n)));
