@@ -1105,16 +1105,16 @@ function openVotePopup(playerKey, role) {
     {key:'espulsione', icon:'🟥', label:'Espulsione', type:'toggle'},
     {key:'autogol', icon:'🤦', label:'Autogol (-3)', type:'counter'}
   ];
-  // Shootout section (visible to all roles)
-  bonusDefs.push({key:'_sep_shootout', icon:'', label:'— Rigori shoot-out —', type:'separator'});
-  bonusDefs.push({key:'shootout_segnato', icon:'🥅', label:'Rigore segnato (+0.5)', type:'counter'});
-  bonusDefs.push({key:'shootout_sbagliato', icon:'💨', label:'Rigore sbagliato (-1)', type:'counter'});
-  if(isGK) bonusDefs.push({key:'shootout_parato', icon:'🧱', label:'Rigore parato (+0.5)', type:'counter'});
   if(isGK) {
     bonusDefs.push({key:'rigore_parato', icon:'🧤', label:'Rigore parato', type:'counter'});
     bonusDefs.push({key:'gol_subiti', icon:'😬', label:'Gol subiti', type:'counter'});
     bonusDefs.push({key:'porta_inviolata', icon:'🛡️', label:'Porta inviolata (no gol subiti)', type:'toggle'});
   }
+  // Shootout section (tutti i ruoli)
+  bonusDefs.push({key:'_sep_shootout', icon:'', label:'— Rigori shoot-out —', type:'separator'});
+  bonusDefs.push({key:'shootout_segnato', icon:'🥅', label:'Rigore segnato (+0.5)', type:'counter'});
+  bonusDefs.push({key:'shootout_sbagliato', icon:'💨', label:'Rigore sbagliato (-1)', type:'counter'});
+  if(isGK) bonusDefs.push({key:'shootout_parato', icon:'🧱', label:'Rigore parato (+0.5)', type:'counter'});
 
   const playerName = playerKey.split('_').slice(0,-1).join('_');
 
